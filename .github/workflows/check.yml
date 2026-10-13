@@ -1,9 +1,11 @@
 name: Check
 
+# Version branches only, such as v2026.1.0: pull requests into one, and commits to one.
 on:
   pull_request:
+    branches: ['v*']
   push:
-    branches: [main]
+    branches: ['v*']
 
 permissions:
   contents: read
