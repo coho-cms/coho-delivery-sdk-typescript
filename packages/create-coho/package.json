@@ -1,0 +1,28 @@
+{
+  "name": "create-coho",
+  "version": "0.0.1",
+  "description": "Create a TypeScript project for Coho CMS. Not yet released.",
+  "license": "Apache-2.0",
+  "bin": {
+    "create-coho": "index.js"
+  },
+  "files": [
+    "index.js"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/coho-cms/coho-delivery-sdk-typescript.git",
+    "directory": "packages/create-coho"
+  },
+  "homepage": "https://github.com/coho-cms/coho-delivery-sdk-typescript#readme",
+  "keywords": [
+    "coho",
+    "cms",
+    "create",
+    "starter",
+    "typescript"
+  ]
+}
