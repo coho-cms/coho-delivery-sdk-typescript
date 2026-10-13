@@ -1,0 +1,38 @@
+name: Publish
+
+# Publishes @coho-cms/delivery and @coho-cms/codegen to GitHub Packages, for testing
+# before they go to npm. Bump both versions, merge, then run this by hand. A version
+# cannot be published twice, so every fix is a new version.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The dist-tag to publish under. Prereleases need one other than latest.
+        required: true
+        default: alpha
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: https://npm.pkg.github.com
+          scope: '@coho-cms'
+      - run: npm ci
+      - run: npm run build
+      - run: npm run typecheck
+      - run: npm test
+      # The tag reaches the shell as a variable, never pasted into the script.
+      - name: Publish
+        run: npm publish --workspace packages/delivery --workspace packages/codegen --tag "$TAG"
+        env:
+          TAG: ${{ inputs.tag }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

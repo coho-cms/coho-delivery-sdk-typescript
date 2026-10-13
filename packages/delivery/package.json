@@ -1,0 +1,40 @@
+{
+  "name": "@coho-cms/delivery",
+  "version": "0.1.0-alpha.1",
+  "description": "The Coho CMS delivery client, and the runtime that generated content libraries call.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test test/*.test.ts",
+    "prepack": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/coho-cms/coho-delivery-sdk-typescript.git",
+    "directory": "packages/delivery"
+  },
+  "homepage": "https://github.com/coho-cms/coho-delivery-sdk-typescript#readme",
+  "keywords": [
+    "coho",
+    "cms",
+    "headless",
+    "delivery",
+    "typescript"
+  ]
+}

@@ -4,5 +4,14 @@
   "license": "Apache-2.0",
   "workspaces": [
     "packages/*"
-  ]
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run build -w @coho-cms/delivery && npm run typecheck --workspaces --if-present",
+    "test": "npm run build -w @coho-cms/delivery && npm test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.0",
+    "typescript": "7.0.2"
+  }
 }
