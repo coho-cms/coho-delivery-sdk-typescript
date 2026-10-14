@@ -2,23 +2,66 @@ import { ResponseCache, deepFreeze, freshUntil } from './cache.ts';
 import { CohoDeliveryError } from './errors.ts';
 import type { EntryGraph, EntryList, Problem } from './types.ts';
 
-export interface DeliveryConfig {
-  /** Where delivery is served, such as `https://delivery.coho.example`. */
-  readonly url?: string;
-  /** The project id. It selects the project; the key is what authorizes. */
-  readonly project?: string;
-  /**
-   * The whole base URL, `…/v1/projects/{project}`, in place of `url` and `project`,
-   * for a mount those cannot express, such as previews through Coho's BFF.
-   */
-  readonly baseUrl?: string;
-  /** A delivery key, sent as `Authorization: Bearer` and never in a URL. */
-  readonly key?: string;
+/** What every config takes, however it reaches Coho. */
+export interface ClientOptions {
   /** The fetch to use. Defaults to the global one. */
   readonly fetch?: typeof globalThis.fetch;
   /** The private response cache: on by default, holding up to 1000 responses. `false` turns it off. */
   readonly cache?: false | { readonly maxEntries?: number };
 }
+
+/**
+ * Released content: tags, and environments pointing at them, such as `qa` and `prod`,
+ * from delivery, with a delivery key.
+ */
+export interface ReleasedConfig extends ClientOptions {
+  /** Where delivery is served, such as `https://delivery.coho.example`. */
+  readonly url: string;
+  /** The project id. It selects the project; the key is what authorizes. */
+  readonly project: string;
+  /**
+   * A delivery key, sent as `Authorization: Bearer` and never in a URL. Leave it out
+   * only for an environment the project has opened to keyless reads.
+   */
+  readonly key?: string;
+  readonly account?: never;
+  readonly token?: never;
+  readonly baseUrl?: never;
+}
+
+/**
+ * Unreleased content: `dev` and branch heads, read live through Coho with a project
+ * token. The same answers in the same shapes as delivery, never cached, so a preview
+ * runs the code production runs.
+ */
+export interface PreviewConfig extends ClientOptions {
+  /** Coho's own URL, where you sign in, such as `https://api.coho.example`. Not delivery's. */
+  readonly url: string;
+  /** The account the project belongs to. */
+  readonly account: string;
+  readonly project: string;
+  /**
+   * A project token, `coho_pt_…`, with read access to the project: the viewer role is
+   * enough. ⚠️ It reads everything unreleased, so keep it on the server, out of any
+   * bundle a browser loads.
+   */
+  readonly token: string;
+  readonly key?: never;
+  readonly baseUrl?: never;
+}
+
+/** The whole base URL, `…/v1/projects/{project}`, for a mount `url` and `project` cannot express. */
+export interface MountedConfig extends ClientOptions {
+  readonly baseUrl: string;
+  /** A delivery key, sent as `Authorization: Bearer` and never in a URL. */
+  readonly key?: string;
+  readonly url?: never;
+  readonly project?: never;
+  readonly account?: never;
+  readonly token?: never;
+}
+
+export type DeliveryConfig = ReleasedConfig | PreviewConfig | MountedConfig;
 
 export interface ReadOptions {
   /** How many reference hops to follow from each root, 0 to 5. The server's default is 0. */
@@ -52,7 +95,7 @@ type Query = Readonly<Record<string, string | number | undefined>>;
 const NOTHING: EntryGraph = deepFreeze({ roots: [], entries: {}, unresolved: {} });
 
 export function createDeliveryClient(config: DeliveryConfig): DeliveryClient {
-  const base = baseUrlOf(config);
+  const { base, credential, reads } = connectionOf(config);
   const fetcher = config.fetch ?? globalThis.fetch;
   const cache = config.cache === false ? undefined : new ResponseCache(config.cache?.maxEntries ?? 1000);
 
@@ -62,7 +105,7 @@ export function createDeliveryClient(config: DeliveryConfig): DeliveryClient {
     if (cached !== undefined && cached.freshUntil > Date.now()) return cached.body as T;
 
     const headers: Record<string, string> = { accept: 'application/json' };
-    if (config.key !== undefined) headers['authorization'] = `Bearer ${config.key}`;
+    if (credential !== undefined) headers['authorization'] = `Bearer ${credential}`;
     if (cached?.etag !== undefined) headers['if-none-match'] = cached.etag;
 
     const response = await fetcher(url, { headers });
@@ -70,7 +113,7 @@ export function createDeliveryClient(config: DeliveryConfig): DeliveryClient {
       remember(url, cached.body, response, cached.etag);
       return cached.body as T;
     }
-    if (!response.ok) throw await refusal(response);
+    if (!response.ok) throw await refusal(response, reads);
 
     let body: unknown;
     try {
@@ -128,12 +171,45 @@ export function createDeliveryClient(config: DeliveryConfig): DeliveryClient {
   };
 }
 
-function baseUrlOf(config: DeliveryConfig): string {
-  if (config.baseUrl !== undefined) return config.baseUrl.replace(/\/+$/, '');
+/** Released content, from delivery; or unreleased, read live through Coho's preview mount. */
+type Reads = 'released' | 'preview';
+
+/** The project token prefix (doc 29), by which Coho tells a token from a person's sign-in. */
+const TOKEN_PREFIX = 'coho_pt_';
+
+/**
+ * Where requests go, and what authorizes them. Checked here as well as in the types,
+ * for callers the types do not reach: plain JavaScript, and configs built from the
+ * environment.
+ */
+function connectionOf(config: DeliveryConfig): { base: string; credential: string | undefined; reads: Reads } {
+  const trim = (url: string): string => url.replace(/\/+$/, '');
+
+  if (config.token !== undefined) {
+    if (config.key !== undefined) throw new TypeError('Coho delivery takes a key or a token, not both');
+    if (config.url === undefined || config.account === undefined || config.project === undefined) {
+      throw new TypeError('A Coho preview needs the url, account and project with its token');
+    }
+    if (!config.token.startsWith(TOKEN_PREFIX)) {
+      throw new TypeError(`A Coho preview token is a project token, starting ${TOKEN_PREFIX}`);
+    }
+    // A token in a browser is a token anyone can read, and it reads everything unreleased.
+    if ('document' in globalThis) {
+      throw new TypeError('A Coho project token must stay on the server: this code is running in a browser');
+    }
+    const project = `${encodeURIComponent(config.account)}/projects/${encodeURIComponent(config.project)}`;
+    return { base: `${trim(config.url)}/api/v1/accounts/${project}/preview`, credential: config.token, reads: 'preview' };
+  }
+
+  if (config.baseUrl !== undefined) return { base: trim(config.baseUrl), credential: config.key, reads: 'released' };
   if (config.url === undefined || config.project === undefined) {
     throw new TypeError('Coho delivery needs a url and a project, or a baseUrl');
   }
-  return `${config.url.replace(/\/+$/, '')}/v1/projects/${encodeURIComponent(config.project)}`;
+  return {
+    base: `${trim(config.url)}/v1/projects/${encodeURIComponent(config.project)}`,
+    credential: config.key,
+    reads: 'released',
+  };
 }
 
 /**
@@ -151,17 +227,30 @@ function queryString(query: Query): string {
   return parts.length === 0 ? '' : `?${parts.join('&')}`;
 }
 
-async function refusal(response: Response): Promise<CohoDeliveryError> {
+async function refusal(response: Response, reads: Reads): Promise<CohoDeliveryError> {
   const problem = await problemOf(response);
   if (problem === undefined) {
     return new CohoDeliveryError(response.status, 'UNEXPECTED_RESPONSE', `Delivery answered ${response.status} with no problem document`);
   }
-  // Delivery answers a key for another project exactly as it answers a project that
-  // does not exist, so that one customer's key cannot confirm another's project.
-  const hint = problem.code === 'PROJECT_NOT_FOUND' ? ' Check that the key was issued for this project.' : '';
   const text = (problem.detail ?? problem.title).replace(/\.$/, '');
-  return new CohoDeliveryError(response.status, problem.code, `${problem.code}: ${text}.${hint}`, problem);
+  return new CohoDeliveryError(response.status, problem.code, `${problem.code}: ${text}.${HINTS[reads][problem.code] ?? ''}`, problem);
 }
+
+/**
+ * What to check, for the refusals whose answer is deliberately vague. A credential for
+ * another project is answered exactly as a project that does not exist, so that one
+ * customer's cannot confirm another's project; and each side serves only its own refs.
+ */
+const HINTS: Record<Reads, Partial<Record<string, string>>> = {
+  released: {
+    PROJECT_NOT_FOUND: ' Check that the key was issued for this project.',
+    REF_NOT_FOUND: ' Delivery serves tags and the environments pointing at them; read a branch, or dev, with a project token.',
+  },
+  preview: {
+    PROJECT_NOT_FOUND: ' Check that the token was issued for this project, and that the account is the one it belongs to.',
+    REF_NOT_FOUND: ' A preview reads branches, and environments pointing at one such as dev; a release is read from delivery, with a key.',
+  },
+};
 
 async function problemOf(response: Response): Promise<Problem | undefined> {
   // Read either JSON type. The contract says `application/problem+json`, and servers

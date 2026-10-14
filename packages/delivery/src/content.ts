@@ -4,14 +4,20 @@ import { hydrate } from './hydrate.ts';
 import type { HydratedEntry, Issue, Shape } from './hydrate.ts';
 import type { EntryGraph } from './types.ts';
 
-export interface ContentConfig extends DeliveryConfig {
-  /** The ref to read: an environment such as `prod`, or a tag. */
+/** What a content client reads, on top of where it reads it from. */
+export interface ContentOptions {
+  /**
+   * The ref to read: an environment such as `prod`, or a tag. With a project token,
+   * a branch, or an environment pointing at one such as `dev`.
+   */
   readonly ref: string;
   /** The locale to project to, unless a read names its own. */
   readonly locale?: string;
   /** Called once per issue, for the life of the client. Defaults to `console.warn`. */
   readonly onIssue?: (issue: Issue) => void;
 }
+
+export type ContentConfig = DeliveryConfig & ContentOptions;
 
 /** A page of hydrated entries. */
 export interface Page<T> {

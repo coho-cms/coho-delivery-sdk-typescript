@@ -147,3 +147,6 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Bundled into create-coho by its publish workflow, from coho-template-typescript.
+packages/create-coho/template/

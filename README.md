@@ -6,7 +6,7 @@ TypeScript packages for reading content from Coho CMS.
 |---|---|
 | [`@coho-cms/delivery`](packages/delivery) | The delivery client, and the runtime generated content libraries call |
 | [`@coho-cms/codegen`](packages/codegen) | Generates a typed content library from your project's content types |
-| [`create-coho`](packages/create-coho) | `npm create coho@latest`: creates your content library. Not released yet |
+| [`create-coho`](packages/create-coho) | `npm create coho@latest`: creates your content library from the template. In testing: run it from a checkout |
 
 ## Development
 
@@ -23,16 +23,19 @@ npm run build
 
 ## Publishing
 
-While in testing, `@coho-cms/delivery` and `@coho-cms/codegen` are published to GitHub Packages as alphas, not to npm. Bump both versions (`0.1.0-alpha.2`, and so on), merge, and run the **Publish** workflow. A version cannot be published twice.
+The three packages are published to npm together, at one version, as alphas for now: `create-coho` pins every library it creates to that version of `@coho-cms/delivery` and `@coho-cms/codegen`, and carries the library template inside it.
 
-Installing from GitHub Packages needs a token even for public packages: a personal access token (classic) with `read:packages`, as `NODE_AUTH_TOKEN`, and an `.npmrc` that sends the scope there:
+1. Bump all three versions to the same new one, such as `0.1.0-alpha.3`, and merge.
+2. Tag [coho-template-typescript](https://github.com/coho-cms/coho-template-typescript) at the commit to ship.
+3. Run the **Publish** workflow, naming that tag. It tests, bundles the template into `create-coho`, and publishes all three under the `alpha` dist-tag.
 
+A version cannot be published twice. The workflow needs `NPM_TOKEN`, an npm token that can publish `create-coho` and the `@coho-cms` scope without a one-time password.
+
+To try `create-coho` from a checkout before publishing, bundle a template into it, or pass `--template`:
+
+```bash
+npm run bundle -w create-coho -- ../coho-template-typescript
 ```
-@coho-cms:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
-```
-
-A package published for the first time is private. Make each one public once, in its settings on GitHub, so other repositories' workflows can install it.
 
 ## License
 

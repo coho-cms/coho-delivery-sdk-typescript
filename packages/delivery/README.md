@@ -49,17 +49,58 @@ if (post?.author && isResolved(post.author)) console.log(post.author.fullName);
 - **A reference that is not resolved is a stub**, `{ _id, _unresolved }`: `depth` when it is beyond the requested depth, `absent` when it is not on the ref, and `cycle` where following it would loop back.
 - **Problems are reported, not thrown.** An entry missing a field its type always has, which happens to older entries after a field becomes required, is passed to `onIssue`, once per entry and field. The default is `console.warn`.
 
-## Keys
+## Released and unreleased content
 
-The delivery key is sent as `Authorization: Bearer` and never in a URL. Keep it on the server: a key in a browser bundle is a key anyone can read.
+What a client reads depends on its credential.
+
+| | Released | Unreleased (a preview) |
+|---|---|---|
+| Refs | Tags, and environments pointing at one, such as `qa` and `prod` | Branches, and environments pointing at one, such as `dev` |
+| Served by | Delivery, cached at the edge | Coho, live, never cached |
+| `url` | Delivery's, such as `https://delivery.coho.example` | Coho's own, where you sign in, such as `https://api.coho.example` |
+| Credential | `key`: a delivery key | `token`: a project token, `coho_pt_…`, with the viewer role, plus the `account` |
+
+```ts
+const preview = createDeliveryClient({
+  url: 'https://api.coho.example',
+  account: '0191…',
+  project: '0192…',
+  token: process.env.COHO_PREVIEW_TOKEN!,
+});
+
+const draft = await preview.entryBySlug('dev', 'home-page', { depth: 2, locale: 'en-US' });
+```
+
+Both answer the same requests in the same shapes, so a preview runs the code production does. Create a token for previews with `coho token create --role viewer`, separate from any token your content library uses to pull its types.
+
+**Keep both on the server.** A credential is sent as `Authorization: Bearer` and never in a URL, but a key or token in a browser bundle is one anyone can read, and a token reads everything unreleased. A client given a token refuses to start in a browser.
+
+### From the environment
+
+`configFromEnv` turns environment variables into a config, so whether a deployment previews or reads releases is a matter of its variables:
+
+```ts
+import { configFromEnv, createContentClient } from '@coho-cms/delivery';
+
+const content = createContentClient(configFromEnv(process.env));
+```
+
+| Variable | |
+|---|---|
+| `COHO_PROJECT`, `COHO_REF` | Always |
+| `COHO_LOCALE` | Optional |
+| `COHO_DELIVERY_URL`, `COHO_DELIVERY_KEY` | Released content. The key may be left out for a public environment |
+| `COHO_PREVIEW_TOKEN`, `COHO_URL`, `COHO_ACCOUNT` | A preview |
+
+Setting a preview token and a delivery key together is refused, since they read different content. For a Next.js app, put them in `.env.local`, never with a `NEXT_PUBLIC_` prefix.
 
 ## Caching
 
-Each client keeps a private cache of responses, following `Cache-Control` and `ETag`. A tag named directly is fetched once. An environment is reused for its short `max-age`, then revalidated, which costs a `304` when nothing was promoted. Pass `cache: false` to turn it off.
+Each client keeps a private cache of responses, following `Cache-Control` and `ETag`. A tag named directly is fetched once. An environment is reused for its short `max-age`, then revalidated, which costs a `304` when nothing was promoted. A preview is fetched every time. Pass `cache: false` to turn it off.
 
 ## Errors
 
-A refusal throws `CohoDeliveryError`. Branch on its `code`: `REF_NOT_FOUND`, `KEY_REQUIRED`, `PROJECT_NOT_FOUND`, `INVALID_QUERY` or `RESOLUTION_LIMIT` for the request; `ARTIFACT_UNREADABLE` or `POOL_UNAVAILABLE` for the server; or `UNEXPECTED_RESPONSE` for an answer that isn't a problem document. A missing entry is `null`, not an error.
+A refusal throws `CohoDeliveryError`. Branch on its `code`: `REF_NOT_FOUND`, `KEY_REQUIRED`, `PROJECT_NOT_FOUND`, `INVALID_QUERY` or `RESOLUTION_LIMIT` for the request; `ARTIFACT_UNREADABLE` or `POOL_UNAVAILABLE` for the server; or `UNEXPECTED_RESPONSE` for an answer that isn't a problem document. A preview adds `UNAUTHENTICATED`, for a token that has expired or been revoked, and `ACCOUNT_SUSPENDED`, `ACCOUNT_CLOSED` and `USER_SUSPENDED`. A missing entry is `null`, not an error.
 
 ## License
 

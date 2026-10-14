@@ -1,7 +1,9 @@
 export { createDeliveryClient } from './client.ts';
-export type { DeliveryClient, DeliveryConfig, ListOptions, ReadOptions } from './client.ts';
+export type { ClientOptions, DeliveryClient, DeliveryConfig, ListOptions, MountedConfig, PreviewConfig, ReadOptions, ReleasedConfig } from './client.ts';
 export { createContentClient } from './content.ts';
-export type { ContentClient, ContentConfig, Page, TypeListOptions, TypeReader } from './content.ts';
+export type { ContentClient, ContentConfig, ContentOptions, Page, TypeListOptions, TypeReader } from './content.ts';
+export { configFromEnv } from './env.ts';
+export type { Env } from './env.ts';
 export { CohoDeliveryError } from './errors.ts';
 export { hydrate, isResolved } from './hydrate.ts';
 export type { EntryBase, HydratedEntry, HydrateOptions, Issue, Linked, LinkKind, Shape, TypeShape, Unresolved } from './hydrate.ts';

@@ -1,16 +1,25 @@
 {
   "name": "create-coho",
-  "version": "0.0.1",
-  "description": "Create a TypeScript project for Coho CMS. Not yet released.",
+  "version": "0.1.0-alpha.3",
+  "description": "Creates a content library for Coho CMS: a TypeScript package, generated from your content types, that your sites and services install.",
   "license": "Apache-2.0",
+  "type": "module",
   "bin": {
-    "create-coho": "index.js"
+    "create-coho": "dist/index.js"
   },
   "files": [
-    "index.js"
+    "dist",
+    "template"
   ],
   "engines": {
     "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test test/*.test.ts",
+    "bundle": "node scripts/bundle.ts",
+    "prepack": "npm run build"
   },
   "repository": {
     "type": "git",

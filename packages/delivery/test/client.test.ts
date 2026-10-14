@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { mock, test } from 'node:test';
 import { CohoDeliveryError, createDeliveryClient } from '../src/index.ts';
+import type { DeliveryConfig } from '../src/index.ts';
 import { BASE, KEY, OTHER_KEY, graph, replay } from './support.ts';
 import type { Call } from './support.ts';
 
@@ -45,16 +46,98 @@ test('requests go to the contract\'s paths, with the key in a header and the par
 
 test('a baseUrl replaces the url and project, for mounts they cannot express', async () => {
   const { fetch, calls } = answering(ok());
-  const client = createDeliveryClient({ baseUrl: 'https://bff.test/api/accounts/acme/projects/p1/preview/', fetch, cache: false });
+  const client = createDeliveryClient({ baseUrl: 'https://proxy.test/coho/v1/projects/p1/', fetch, cache: false });
 
-  await client.entries('feature/x');
+  await client.entries('prod');
 
-  assert.equal(calls[0]?.url, 'https://bff.test/api/accounts/acme/projects/p1/preview/feature%2Fx/entries');
+  assert.equal(calls[0]?.url, 'https://proxy.test/coho/v1/projects/p1/prod/entries');
   assert.equal(calls[0]?.headers['authorization'], undefined);
 });
 
 test('a client needs a url and a project, or a baseUrl', () => {
-  assert.throws(() => createDeliveryClient({ url: 'https://delivery.test' }), TypeError);
+  // The types refuse this; plain JavaScript reaches the check.
+  assert.throws(() => createDeliveryClient({ url: 'https://delivery.test' } as unknown as DeliveryConfig), TypeError);
+});
+
+/* PREVIEWS */
+/* PREVIEWS */
+/* PREVIEWS */
+
+const TOKEN = `coho_pt_${'a'.repeat(43)}`;
+
+test('a preview reads through Coho\'s preview mount, with the token in a header', async () => {
+  const { fetch, calls } = answering(ok({ 'cache-control': 'no-cache' }));
+  const client = createDeliveryClient({ url: 'https://coho.test/', account: 'acme', project: 'p1', token: TOKEN, fetch });
+
+  await client.entries('dev', { type: 'article', locale: 'en-US' });
+  await client.entryBySlug('feature/x', 'hello');
+
+  assert.deepEqual(calls.map((call) => call.url), [
+    'https://coho.test/api/v1/accounts/acme/projects/p1/preview/dev/entries?locale=en-US&type=article',
+    'https://coho.test/api/v1/accounts/acme/projects/p1/preview/feature%2Fx/entries-by-slug/hello',
+  ]);
+  for (const call of calls) {
+    assert.equal(call.headers['authorization'], `Bearer ${TOKEN}`);
+    assert.equal(call.url.includes(TOKEN), false);
+  }
+});
+
+test('a preview is never answered from the cache', async () => {
+  const { fetch, calls } = answering(ok({ 'cache-control': 'no-cache' }));
+  const client = createDeliveryClient({ url: 'https://coho.test', account: 'acme', project: 'p1', token: TOKEN, fetch });
+
+  await client.entries('dev');
+  await client.entries('dev');
+
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1]?.headers['if-none-match'], undefined);
+});
+
+test('a preview needs its account and a project token, and takes no key', () => {
+  // Each refused by the types too; plain JavaScript and the environment reach these checks.
+  const as = (config: object) => () => createDeliveryClient(config as DeliveryConfig);
+  assert.throws(as({ url: 'https://coho.test', project: 'p1', token: TOKEN }), /url, account and project/);
+  assert.throws(as({ url: 'https://coho.test', account: 'acme', project: 'p1', token: 'eyJhbGciOi' }), /starting coho_pt_/);
+  assert.throws(as({ url: 'https://coho.test', account: 'acme', project: 'p1', token: TOKEN, key: 'k' }), /not both/);
+
+  // Never called: `npm run typecheck` fails if the types stop refusing these.
+  const refusedByTheTypes = () => {
+    // @ts-expect-error A token needs its account.
+    createDeliveryClient({ url: 'https://coho.test', project: 'p1', token: TOKEN });
+    // @ts-expect-error A key or a token, never both.
+    createDeliveryClient({ url: 'https://coho.test', account: 'acme', project: 'p1', token: TOKEN, key: 'k' });
+    // @ts-expect-error An account means a preview, which needs its token.
+    createDeliveryClient({ url: 'https://coho.test', account: 'acme', project: 'p1', key: 'k' });
+  };
+  void refusedByTheTypes;
+});
+
+test('a project token is refused in a browser', () => {
+  Object.defineProperty(globalThis, 'document', { value: {}, configurable: true });
+  try {
+    assert.throws(
+      () => createDeliveryClient({ url: 'https://coho.test', account: 'acme', project: 'p1', token: TOKEN }),
+      /must stay on the server/,
+    );
+  } finally {
+    Reflect.deleteProperty(globalThis, 'document');
+  }
+});
+
+test('a refusal says what to check, for what is being read', async () => {
+  const problem = (code: string, status: number) => () =>
+    new Response(JSON.stringify({ code, title: 'Not found', status, detail: 'No such thing' }), {
+      status,
+      headers: { 'content-type': 'application/problem+json' },
+    });
+  const preview = (code: string) =>
+    createDeliveryClient({ url: 'https://coho.test', account: 'acme', project: 'p1', token: TOKEN, fetch: answering(problem(code, 404)).fetch });
+  const released = (code: string) =>
+    createDeliveryClient({ url: 'https://delivery.test', project: 'p1', key: KEY, fetch: answering(problem(code, 404)).fetch });
+
+  await assert.rejects(preview('PROJECT_NOT_FOUND').entries('dev'), /token was issued for this project/);
+  await assert.rejects(preview('REF_NOT_FOUND').entries('prod'), /a release is read from delivery/);
+  await assert.rejects(released('REF_NOT_FOUND').entries('dev'), /read a branch, or dev, with a project token/);
 });
 
 test('an empty id list asks nothing', async () => {

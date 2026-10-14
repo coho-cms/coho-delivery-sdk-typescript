@@ -1,8 +1,10 @@
 name: Publish
 
-# Publishes @coho-cms/delivery and @coho-cms/codegen to GitHub Packages, for testing
-# before they go to npm. Bump both versions, merge, then run this by hand. A version
-# cannot be published twice, so every fix is a new version.
+# Publishes @coho-cms/delivery, @coho-cms/codegen and create-coho to npm, together and
+# at one version: create-coho pins the libraries it creates to that version, and
+# carries the library template, bundled from the ref named here. Bump all three
+# versions, merge, tag the template, then run this by hand. A version cannot be
+# published twice, so every fix is a new version.
 on:
   workflow_dispatch:
     inputs:
@@ -10,29 +12,38 @@ on:
         description: The dist-tag to publish under. Prereleases need one other than latest.
         required: true
         default: alpha
+      template-ref:
+        description: The coho-template-typescript tag or branch to bundle into create-coho
+        required: true
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - name: Check out the template to bundle
+        uses: actions/checkout@v5
+        with:
+          repository: coho-cms/coho-template-typescript
+          ref: ${{ inputs.template-ref }}
+          path: template-checkout
       - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
-          registry-url: https://npm.pkg.github.com
-          scope: '@coho-cms'
+          registry-url: https://registry.npmjs.org
       - run: npm ci
       - run: npm run build
       - run: npm run typecheck
       - run: npm test
+      - name: Bundle the template into create-coho
+        run: npm run bundle -w create-coho -- "$GITHUB_WORKSPACE/template-checkout"
       # The tag reaches the shell as a variable, never pasted into the script.
       - name: Publish
-        run: npm publish --workspace packages/delivery --workspace packages/codegen --tag "$TAG"
+        run: npm publish --workspaces --tag "$TAG"
         env:
           TAG: ${{ inputs.tag }}
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
