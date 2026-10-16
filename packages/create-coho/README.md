@@ -30,7 +30,7 @@ Nothing is created if Coho refuses the token.
 | `--no-install` | Don't run `npm install` |
 | `-y`, `--yes` | Ask nothing |
 
-**A version of create-coho always creates the same library.** It carries the template it was released with, and pins the library to `@coho-cms/delivery` and `@coho-cms/codegen` at its own version. `create-coho@0.1.0-alpha.3` creates libraries on `0.1.0-alpha.3`.
+**A version of create-coho always creates the same library.** It carries the template it was released with, and pins the library to `@coho-cms/delivery` and `@coho-cms/codegen` at its own version. `create-coho@0.1.0-alpha.4` creates libraries on `0.1.0-alpha.4`.
 
 A checkout's `.git`, `node_modules`, `dist` and `.env` are never copied, so a template folder with your own token in it is safe to pass to `--template`.
 
