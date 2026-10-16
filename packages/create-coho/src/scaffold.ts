@@ -82,6 +82,18 @@ export function customize(dir: string, answers: Answers): void {
 }
 
 /**
+ * Writes the library's `.env` from its `.env.example`, with [token] as `COHO_TOKEN`, so
+ * `npm run pull` works at once. `.env` is in the template's `.gitignore`, and only its
+ * owner can read it.
+ */
+export function writeEnv(dir: string, token: string): void {
+  const example = join(dir, '.env.example');
+  const lines = existsSync(example) ? readFileSync(example, 'utf8') : '';
+  const env = /^COHO_TOKEN=.*$/m.test(lines) ? lines.replace(/^COHO_TOKEN=.*$/m, `COHO_TOKEN=${token}`) : `COHO_TOKEN=${token}\n${lines}`;
+  writeFileSync(join(dir, '.env'), env, { mode: 0o600 });
+}
+
+/**
  * Pins the library to the SDK released with this create-coho, [version]: exactly, for
  * the packages it builds with, and from there up for its peer dependency. The
  * template's lockfile goes, so the first install resolves exactly these.
