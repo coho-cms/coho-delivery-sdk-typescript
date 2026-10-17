@@ -16,8 +16,11 @@ Node 22.18 or later, which runs the TypeScript tests directly.
 npm install
 npm test
 npm run typecheck
+npm run lint
 npm run build
 ```
+
+`npm run lint -- --fix` reformats. Allman braces: an opening brace goes on its own line.
 
 `spec/` is a copy of [coho-sdk-spec](https://github.com/coho-cms/coho-sdk-spec): recorded delivery responses and type model fixtures, produced by the Coho server. The tests run against it, so these packages agree with the server. Don't edit it by hand.
 

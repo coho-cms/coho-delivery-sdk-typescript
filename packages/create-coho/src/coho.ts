@@ -4,7 +4,8 @@ import { CreateError } from './scaffold.ts';
 export const TOKEN_PREFIX = 'coho_pt_';
 
 /** What a project token says about itself: Coho's `GET /api/v1/token`. */
-export interface TokenDescription {
+export interface TokenDescription
+{
   readonly account: { readonly id: string; readonly name?: string | null };
   readonly project: { readonly id: string; readonly name: string };
   readonly token: { readonly id: string; readonly label: string; readonly role: string; readonly expiresAt: string };
@@ -14,18 +15,23 @@ export interface TokenDescription {
  * Asks Coho at [url] which account and project [token] is for. A token names its own
  * project, so nothing else is needed to find them: no account or project ids to copy.
  */
-export async function describeToken(url: string, token: string, fetch: typeof globalThis.fetch = globalThis.fetch): Promise<TokenDescription> {
+export async function describeToken(url: string, token: string, fetch: typeof globalThis.fetch = globalThis.fetch): Promise<TokenDescription>
+{
   if (!/^https?:\/\//.test(url)) throw new CreateError(`'${url}' is not a URL, such as https://app.coho.example`);
-  if (!token.startsWith(TOKEN_PREFIX)) {
+  if (!token.startsWith(TOKEN_PREFIX))
+  {
     throw new CreateError(`A project token starts ${TOKEN_PREFIX}. Create one with: coho token create --role viewer`);
   }
 
   let response: Response;
-  try {
+  try
+  {
     response = await fetch(`${url.replace(/\/+$/, '')}/api/v1/token`, {
       headers: { authorization: `Bearer ${token}`, accept: 'application/json' },
     });
-  } catch (error) {
+  }
+  catch (error)
+  {
     throw new CreateError(`Coho is not reachable at ${url}: ${(error as Error).message}`);
   }
   if (response.ok) return (await response.json()) as TokenDescription;

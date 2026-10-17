@@ -10,7 +10,8 @@ import { CreateError } from '../src/scaffold.ts';
 import { resolveTemplate } from '../src/source.ts';
 import { temp, template } from './fixture.ts';
 
-test('a local folder is used as it is, and nothing is cleaned up', async () => {
+test('a local folder is used as it is, and nothing is cleaned up', async () =>
+{
   const dir = template();
 
   const resolved = await resolveTemplate(dir);
@@ -20,11 +21,13 @@ test('a local folder is used as it is, and nothing is cleaned up', async () => {
   assert.ok(existsSync(join(dir, 'package.json')));
 });
 
-test('something that is neither a folder nor owner/repo is refused', async () => {
+test('something that is neither a folder nor owner/repo is refused', async () =>
+{
   await assert.rejects(resolveTemplate('not a template'), CreateError);
 });
 
-test('a GitHub repository is downloaded for its ref, unpacked, and cleaned up after', async () => {
+test('a GitHub repository is downloaded for its ref, unpacked, and cleaned up after', async () =>
+{
   // An archive shaped like GitHub's: one folder, named for the repository and ref.
   const work = temp();
   cpSync(template(), join(work, 'coho-template-typescript-v2026.1.0'), { recursive: true });
@@ -32,14 +35,16 @@ test('a GitHub repository is downloaded for its ref, unpacked, and cleaned up af
   assert.equal(spawnSync('tar', ['-czf', archive, '-C', work, 'coho-template-typescript-v2026.1.0']).status, 0);
 
   const asked: string[] = [];
-  const server = createServer((request, response) => {
+  const server = createServer((request, response) =>
+  {
     asked.push(request.url ?? '');
     response.end(readFileSync(archive));
   });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
 
-  try {
+  try
+  {
     const { port } = server.address() as AddressInfo;
     const resolved = await resolveTemplate('coho-cms/coho-template-typescript#v2026.1.0', { archives: `http://127.0.0.1:${port}` });
 
@@ -49,12 +54,15 @@ test('a GitHub repository is downloaded for its ref, unpacked, and cleaned up af
 
     resolved.cleanup();
     assert.ok(!existsSync(resolved.dir));
-  } finally {
+  }
+  finally
+  {
     server.close();
   }
 });
 
-test('a failed download says which template', async () => {
+test('a failed download says which template', async () =>
+{
   const fetch = (async () => new Response('Not Found', { status: 404 })) as typeof globalThis.fetch;
 
   await assert.rejects(

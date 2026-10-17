@@ -13,13 +13,16 @@ const CLI = fileURLToPath(new URL('../src/index.ts', import.meta.url));
 const BUNDLED = fileURLToPath(new URL('../template', import.meta.url));
 
 /** Runs create-coho in [dir], without a terminal, so nothing is asked. */
-function run(dir: string, args: string[]) {
+function run(dir: string, args: string[])
+{
   return spawnSync(process.execPath, [CLI, ...args], { cwd: dir, encoding: 'utf8', env: withoutToken() });
 }
 
 /** The same, without blocking, so a stand-in Coho in this process can answer it. */
-function runAsync(dir: string, args: string[]): Promise<{ status: number | null; stdout: string; stderr: string }> {
-  return new Promise((done) => {
+function runAsync(dir: string, args: string[]): Promise<{ status: number | null; stdout: string; stderr: string }>
+{
+  return new Promise((done) =>
+  {
     const child = spawn(process.execPath, [CLI, ...args], { cwd: dir, env: withoutToken() });
     let stdout = '';
     let stderr = '';
@@ -30,7 +33,8 @@ function runAsync(dir: string, args: string[]): Promise<{ status: number | null;
 }
 
 /** This environment, less a COHO_TOKEN set for the coho CLI, which create-coho would pick up. */
-function withoutToken(): NodeJS.ProcessEnv {
+function withoutToken(): NodeJS.ProcessEnv
+{
   const { COHO_TOKEN: _, ...env } = process.env;
   return env;
 }
@@ -38,9 +42,11 @@ function withoutToken(): NodeJS.ProcessEnv {
 const TOKEN = `coho_pt_${'A'.repeat(22)}${'b'.repeat(43)}`;
 
 /** A stand-in for Coho's `GET /api/v1/token`, answering [status] and [body], and noting what it was asked. */
-async function coho(status: number, body: unknown) {
+async function coho(status: number, body: unknown)
+{
   const asked: { path: string; authorization: string | undefined }[] = [];
-  const server = createServer((request, response) => {
+  const server = createServer((request, response) =>
+  {
     asked.push({ path: request.url ?? '', authorization: request.headers.authorization });
     response.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body));
   });
@@ -56,7 +62,8 @@ const described = (role: string) => ({
 
 const json = (path: string): Record<string, unknown> => JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
 
-test('a library is created from a template folder, named, configured, and pinned to this version\'s SDK', () => {
+test('a library is created from a template folder, named, configured, and pinned to this version\'s SDK', () =>
+{
   const cwd = temp();
 
   const created = run(cwd, ['content', '--template', template(), '--name', '@acme/content', '--ref', 'v1.4.0', '--no-install']);
@@ -75,9 +82,11 @@ test('a library is created from a template folder, named, configured, and pinned
   assert.match(created.stdout, /cp \.env\.example \.env/);
 });
 
-test('with a URL and a token, Coho says which account and project, and the token goes in .env', async () => {
+test('with a URL and a token, Coho says which account and project, and the token goes in .env', async () =>
+{
   const server = await coho(200, described('viewer'));
-  try {
+  try
+  {
     const cwd = temp();
 
     const created = await runAsync(cwd, ['content', '--template', template(), '--name', '@acme/content', '--url', server.url, '--token', TOKEN, '--ref', 'v1.4.0', '--no-install']);
@@ -90,26 +99,34 @@ test('with a URL and a token, Coho says which account and project, and the token
     assert.match(created.stdout, /It reads blog-sample, in Acme, with the token in \.env\./);
     assert.doesNotMatch(created.stdout, /viewer token is enough/);
     assert.doesNotMatch(created.stdout, /cp \.env\.example|set .* in coho\.config\.json/);
-  } finally {
+  }
+  finally
+  {
     server.close();
   }
 });
 
-test('a token that can do more than read is used, with a word about it', async () => {
+test('a token that can do more than read is used, with a word about it', async () =>
+{
   const server = await coho(200, described('maintainer'));
-  try {
+  try
+  {
     const created = await runAsync(temp(), ['content', '--template', template(), '--url', server.url, '--token', TOKEN, '--no-install']);
 
     assert.equal(created.status, 0, created.stderr);
     assert.match(created.stdout, /That token is a maintainer\. The library only reads, so a viewer token is enough/);
-  } finally {
+  }
+  finally
+  {
     server.close();
   }
 });
 
-test('a token Coho refuses leaves nothing created', async () => {
+test('a token Coho refuses leaves nothing created', async () =>
+{
   const server = await coho(401, { code: 'UNAUTHENTICATED', title: 'Not authenticated', status: 401, detail: 'This project token has been revoked' });
-  try {
+  try
+  {
     const cwd = temp();
 
     const refused = await runAsync(cwd, ['content', '--template', template(), '--url', server.url, '--token', TOKEN, '--no-install']);
@@ -117,12 +134,15 @@ test('a token Coho refuses leaves nothing created', async () => {
     assert.equal(refused.status, 1);
     assert.match(refused.stderr, /Coho refused the token \(UNAUTHENTICATED: This project token has been revoked\)\. Check that it is a current project token/);
     assert.ok(!existsSync(join(cwd, 'content')));
-  } finally {
+  }
+  finally
+  {
     server.close();
   }
 });
 
-test('a token without a URL, or a value that is not a project token, is refused before anything is asked', () => {
+test('a token without a URL, or a value that is not a project token, is refused before anything is asked', () =>
+{
   const cwd = temp();
 
   const noUrl = run(cwd, ['content', '--template', template(), '--token', TOKEN, '--no-install']);
@@ -135,7 +155,8 @@ test('a token without a URL, or a value that is not a project token, is refused 
   assert.ok(!existsSync(join(cwd, 'content')));
 });
 
-test('without a terminal nothing is asked, and the name defaults from the directory', () => {
+test('without a terminal nothing is asked, and the name defaults from the directory', () =>
+{
   const cwd = temp();
 
   const created = run(cwd, ['news', '--template', template(), '--no-install']);
@@ -144,7 +165,8 @@ test('without a terminal nothing is asked, and the name defaults from the direct
   assert.equal(json(join(cwd, 'news', 'package.json'))['name'], '@your-org/news');
 });
 
-test('a bundled template\'s dotfiles come back in the library', () => {
+test('a bundled template\'s dotfiles come back in the library', () =>
+{
   const bundle = join(temp(), 'template');
   bundleTemplate(template({ npmrc: true }), bundle);
   const cwd = temp();
@@ -156,7 +178,8 @@ test('a bundled template\'s dotfiles come back in the library', () => {
   assert.ok(existsSync(join(cwd, 'content', '.npmrc')));
 });
 
-test('a directory with files in it is refused, and so is a name npm would refuse', () => {
+test('a directory with files in it is refused, and so is a name npm would refuse', () =>
+{
   const cwd = temp();
   mkdirSync(join(cwd, 'taken'));
   writeFileSync(join(cwd, 'taken', 'notes.md'), '');
@@ -172,7 +195,8 @@ test('a directory with files in it is refused, and so is a name npm would refuse
 });
 
 // The two below use this package's own template/ folder, so they stand aside for a real bundle.
-test('with no bundled template, and no --template, nothing is created or asked', { skip: existsSync(BUNDLED) && 'a bundle is present' }, () => {
+test('with no bundled template, and no --template, nothing is created or asked', { skip: existsSync(BUNDLED) && 'a bundle is present' }, () =>
+{
   const cwd = temp();
 
   const refused = run(cwd, ['content', '--name', '@acme/content', '--no-install']);
@@ -182,9 +206,11 @@ test('with no bundled template, and no --template, nothing is created or asked',
   assert.ok(!existsSync(join(cwd, 'content')));
 });
 
-test('without --template, the bundled template is used', { skip: existsSync(BUNDLED) && 'a bundle is present' }, () => {
+test('without --template, the bundled template is used', { skip: existsSync(BUNDLED) && 'a bundle is present' }, () =>
+{
   bundleTemplate(template(), BUNDLED);
-  try {
+  try
+  {
     const cwd = temp();
 
     const created = run(cwd, ['content', '--name', '@acme/content', '--no-install']);
@@ -192,12 +218,15 @@ test('without --template, the bundled template is used', { skip: existsSync(BUND
     assert.equal(created.status, 0, created.stderr);
     assert.match(created.stdout, /from the bundled template/);
     assert.ok(existsSync(join(cwd, 'content', '.gitignore')));
-  } finally {
+  }
+  finally
+  {
     rmSync(BUNDLED, { recursive: true, force: true });
   }
 });
 
-test('--help prints the usage', () => {
+test('--help prints the usage', () =>
+{
   const help = run(temp(), ['--help']);
 
   assert.equal(help.status, 0);

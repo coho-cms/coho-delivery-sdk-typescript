@@ -5,7 +5,8 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CreateError } from './scaffold.ts';
 
-export interface Template {
+export interface Template
+{
   /** A folder holding the template's files. */
   readonly dir: string;
   /** What it came from, for telling the person running it. */
@@ -19,15 +20,18 @@ export interface Template {
  * create-coho always creates the same library. A checkout has one only after
  * `npm run bundle`.
  */
-export function bundledTemplate(): Template {
+export function bundledTemplate(): Template
+{
   const dir = fileURLToPath(new URL('../template', import.meta.url));
-  if (!existsSync(join(dir, 'package.json'))) {
+  if (!existsSync(join(dir, 'package.json')))
+  {
     throw new CreateError('This create-coho has no bundled template. Pass --template <folder>, or run `npm run bundle -- <template folder>` first.');
   }
   return { dir, from: 'the bundled template', cleanup: () => {} };
 }
 
-export interface SourceOptions {
+export interface SourceOptions
+{
   readonly fetch?: typeof globalThis.fetch;
   /** Where GitHub archives are downloaded from. */
   readonly archives?: string;
@@ -38,7 +42,8 @@ export interface SourceOptions {
  * `owner/repo#ref`, downloaded and unpacked. A folder wins, so a local checkout can
  * be tried before anything is pushed.
  */
-export async function resolveTemplate(spec: string, options: SourceOptions = {}): Promise<Template> {
+export async function resolveTemplate(spec: string, options: SourceOptions = {}): Promise<Template>
+{
   const local = resolve(spec);
   if (existsSync(local) && statSync(local).isDirectory()) return { dir: local, from: local, cleanup: () => {} };
 
@@ -52,7 +57,8 @@ export async function resolveTemplate(spec: string, options: SourceOptions = {})
 
   const work = mkdtempSync(join(tmpdir(), 'create-coho-'));
   const cleanup = (): void => rmSync(work, { recursive: true, force: true });
-  try {
+  try
+  {
     const archive = join(work, 'template.tar.gz');
     writeFileSync(archive, Buffer.from(await response.arrayBuffer()));
     const dir = join(work, 'template');
@@ -60,11 +66,14 @@ export async function resolveTemplate(spec: string, options: SourceOptions = {})
 
     // An archive holds one folder named for the repository and ref; its contents are the template.
     const tar = spawnSync('tar', ['-xzf', archive, '--strip-components=1', '-C', dir], { encoding: 'utf8' });
-    if (tar.error !== undefined || tar.status !== 0) {
+    if (tar.error !== undefined || tar.status !== 0)
+    {
       throw new CreateError(`Unpacking the template needs tar: ${tar.error?.message ?? tar.stderr.trim()}`);
     }
     return { dir, from: `${owner}/${repo}#${ref}`, cleanup };
-  } catch (error) {
+  }
+  catch (error)
+  {
     cleanup();
     throw error;
   }

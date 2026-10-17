@@ -7,20 +7,24 @@ import { temp, template } from './fixture.ts';
 
 const json = (path: string): Record<string, unknown> => JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
 
-test('the template is copied without history, installed or built files, tarballs, or anyone\'s .env', () => {
+test('the template is copied without history, installed or built files, tarballs, or anyone\'s .env', () =>
+{
   const target = join(temp(), 'content');
 
   copyTemplate(template(), target);
 
-  for (const kept of ['package.json', 'coho.config.json', 'README.md', '.gitignore', '.env.example', 'src/index.ts', 'src/coho/index.ts']) {
+  for (const kept of ['package.json', 'coho.config.json', 'README.md', '.gitignore', '.env.example', 'src/index.ts', 'src/coho/index.ts'])
+  {
     assert.ok(existsSync(join(target, kept)), `${kept} is copied`);
   }
-  for (const left of ['.env', '.git', 'node_modules', 'dist', 'your-org-content-0.1.0.tgz']) {
+  for (const left of ['.env', '.git', 'node_modules', 'dist', 'your-org-content-0.1.0.tgz'])
+  {
     assert.ok(!existsSync(join(target, left)), `${left} is left behind`);
   }
 });
 
-test('a bundle keeps the dotfiles npm would drop under other names, and a library gets them back', () => {
+test('a bundle keeps the dotfiles npm would drop under other names, and a library gets them back', () =>
+{
   const bundle = join(temp(), 'template');
   bundleTemplate(template({ npmrc: true }), bundle);
 
@@ -36,7 +40,8 @@ test('a bundle keeps the dotfiles npm would drop under other names, and a librar
   assert.ok(!existsSync(join(library, 'gitignore')));
 });
 
-test('the library is named, pointed at its project, and titled', () => {
+test('the library is named, pointed at its project, and titled', () =>
+{
   const target = join(temp(), 'content');
   copyTemplate(template(), target);
 
@@ -55,7 +60,8 @@ test('the library is named, pointed at its project, and titled', () => {
   assert.match(readFileSync(join(target, 'README.md'), 'utf8'), /^# @acme\/content\n\nThe starting point/);
 });
 
-test('the SDK is pinned to the version given, and the template\'s lockfile goes', () => {
+test('the SDK is pinned to the version given, and the template\'s lockfile goes', () =>
+{
   const target = join(temp(), 'content');
   copyTemplate(template(), target);
 
@@ -67,12 +73,14 @@ test('the SDK is pinned to the version given, and the template\'s lockfile goes'
   assert.ok(!existsSync(join(target, 'package-lock.json')));
 });
 
-test('package names follow npm\'s rules', () => {
+test('package names follow npm\'s rules', () =>
+{
   for (const name of ['@acme/content', 'acme-content', '@a.b/c_d~e']) assert.equal(isValidPackageName(name), true, name);
   for (const name of ['Acme', '@acme/', '@/content', 'has space', `${'x'.repeat(215)}`, '']) assert.equal(isValidPackageName(name), false, name);
 });
 
-test('a directory is free when it is missing, or holds nothing but a .git', () => {
+test('a directory is free when it is missing, or holds nothing but a .git', () =>
+{
   const dir = temp();
   assert.equal(isFree(join(dir, 'missing')), true);
 

@@ -11,7 +11,8 @@ import { bundleTemplate } from '../src/scaffold.ts';
 const given = process.argv[2];
 // npm runs scripts from the package's folder; a relative path means where npm was run.
 const from = given === undefined ? undefined : resolve(process.env['INIT_CWD'] ?? process.cwd(), given);
-if (from === undefined || !existsSync(join(from, 'package.json'))) {
+if (from === undefined || !existsSync(join(from, 'package.json')))
+{
   console.error('Usage: npm run bundle -- <template folder>, a checkout of coho-template-typescript');
   process.exit(1);
 }

@@ -2,15 +2,18 @@ import { cpSync, existsSync, readFileSync, readdirSync, renameSync, rmSync, writ
 import { basename, join } from 'node:path';
 
 /** A refusal to go on, with a message for whoever ran it. */
-export class CreateError extends Error {
-  constructor(message: string) {
+export class CreateError extends Error
+{
+  constructor(message: string)
+  {
     super(message);
     this.name = 'CreateError';
   }
 }
 
 /** What the new library is set up with. A value left out keeps the template's placeholder. */
-export interface Answers {
+export interface Answers
+{
   readonly name: string;
   readonly url?: string;
   readonly account?: string;
@@ -35,7 +38,8 @@ const PACKED_AS: Readonly<Record<string, string>> = { gitignore: '.gitignore', n
 const SDK = ['@coho-cms/delivery', '@coho-cms/codegen'] as const;
 
 /** Copies the template in [from] into [to], leaving behind what must not travel. */
-export function copyTemplate(from: string, to: string): void {
+export function copyTemplate(from: string, to: string): void
+{
   cpSync(from, to, {
     recursive: true,
     filter: (source) => source === from || (!LEFT_BEHIND.has(basename(source)) && !source.endsWith('.tgz')),
@@ -47,30 +51,38 @@ export function copyTemplate(from: string, to: string): void {
  * create-coho: the lockfile stays behind, since a new library pins its own versions,
  * and each dotfile npm would drop travels under its packed name.
  */
-export function bundleTemplate(from: string, to: string): void {
+export function bundleTemplate(from: string, to: string): void
+{
   rmSync(to, { recursive: true, force: true });
   copyTemplate(from, to);
   rmSync(join(to, 'package-lock.json'), { force: true });
-  for (const [packed, dotfile] of Object.entries(PACKED_AS)) {
+  for (const [packed, dotfile] of Object.entries(PACKED_AS))
+  {
     if (existsSync(join(to, dotfile))) renameSync(join(to, dotfile), join(to, packed));
   }
 }
 
 /** Gives a library copied from a bundled template its dotfiles back. */
-export function restoreDotfiles(dir: string): void {
-  for (const [packed, dotfile] of Object.entries(PACKED_AS)) {
+export function restoreDotfiles(dir: string): void
+{
+  for (const [packed, dotfile] of Object.entries(PACKED_AS))
+  {
     if (existsSync(join(dir, packed))) renameSync(join(dir, packed), join(dir, dotfile));
   }
 }
 
 /** Sets the library up as [answers] say: its package name, and where its content types come from. */
-export function customize(dir: string, answers: Answers): void {
-  editJson(join(dir, 'package.json'), (pkg) => {
+export function customize(dir: string, answers: Answers): void
+{
+  editJson(join(dir, 'package.json'), (pkg) =>
+  {
     pkg['name'] = answers.name;
   });
 
-  editJson(join(dir, 'coho.config.json'), (config) => {
-    for (const key of ['url', 'account', 'project', 'ref'] as const) {
+  editJson(join(dir, 'coho.config.json'), (config) =>
+  {
+    for (const key of ['url', 'account', 'project', 'ref'] as const)
+    {
       const value = answers[key];
       if (value !== undefined && value !== '') config[key] = value;
     }
@@ -86,7 +98,8 @@ export function customize(dir: string, answers: Answers): void {
  * `npm run pull` works at once. `.env` is in the template's `.gitignore`, and only its
  * owner can read it.
  */
-export function writeEnv(dir: string, token: string): void {
+export function writeEnv(dir: string, token: string): void
+{
   const example = join(dir, '.env.example');
   const lines = existsSync(example) ? readFileSync(example, 'utf8') : '';
   const env = /^COHO_TOKEN=.*$/m.test(lines) ? lines.replace(/^COHO_TOKEN=.*$/m, `COHO_TOKEN=${token}`) : `COHO_TOKEN=${token}\n${lines}`;
@@ -98,8 +111,10 @@ export function writeEnv(dir: string, token: string): void {
  * the packages it builds with, and from there up for its peer dependency. The
  * template's lockfile goes, so the first install resolves exactly these.
  */
-export function pinSdk(dir: string, version: string): void {
-  editJson(join(dir, 'package.json'), (pkg) => {
+export function pinSdk(dir: string, version: string): void
+{
+  editJson(join(dir, 'package.json'), (pkg) =>
+  {
     const dev = (pkg['devDependencies'] ?? {}) as Record<string, string>;
     for (const name of SDK) dev[name] = version;
     pkg['devDependencies'] = dev;
@@ -112,16 +127,19 @@ export function pinSdk(dir: string, version: string): void {
 }
 
 /** Whether npm would accept [name], such as `@acme/content`. */
-export function isValidPackageName(name: string): boolean {
+export function isValidPackageName(name: string): boolean
+{
   return name.length <= 214 && /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/.test(name);
 }
 
 /** Whether [dir] can be created into: it does not exist, or holds nothing but a `.git`. */
-export function isFree(dir: string): boolean {
+export function isFree(dir: string): boolean
+{
   return !existsSync(dir) || readdirSync(dir).every((name) => name === '.git');
 }
 
-function editJson(path: string, edit: (json: Record<string, unknown>) => void): void {
+function editJson(path: string, edit: (json: Record<string, unknown>) => void): void
+{
   if (!existsSync(path)) throw new CreateError(`The template has no ${basename(path)}`);
   const json = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
   edit(json);

@@ -14,7 +14,8 @@ const shape: Shape = { article: { links: { related: 'many' } } };
 /** The `related` links of an entry, as hydration left them. */
 const related = (entry: unknown): HydratedEntry[] => (entry as { related: HydratedEntry[] }).related;
 
-test('a depth-2 read is a tree: links resolve, the dangling one is absent, and the way back to the root is a cycle', () => {
+test('a depth-2 read is a tree: links resolve, the dangling one is absent, and the way back to the root is a cycle', () =>
+{
   const [root] = hydrate(graph('entry-by-slug-depth-2'), shape);
   assert.ok(root);
 
@@ -30,17 +31,20 @@ test('a depth-2 read is a tree: links resolve, the dangling one is absent, and t
   assert.doesNotThrow(() => JSON.stringify(root));
 });
 
-test('a link beyond the requested depth is a depth stub', () => {
+test('a link beyond the requested depth is a depth stub', () =>
+{
   const [root] = hydrate(graph('entry-by-slug'), shape);
   assert.deepEqual(related(root), [{ _id: C2, _unresolved: 'depth' }]);
 });
 
-test('without a shape, references stay ids', () => {
+test('without a shape, references stay ids', () =>
+{
   const [root] = hydrate(graph('entry-by-slug-depth-2'));
   assert.deepEqual(related(root), [C2]);
 });
 
-test('system keys sit beside the fields, and a field named like one is untouched', () => {
+test('system keys sit beside the fields, and a field named like one is untouched', () =>
+{
   const entry = { id: 'e1', slug: 'thing', type: 'product', locale: 'en-US', fields: { id: 'SKU-1', type: 'widget', slug: 'x', locale: 'fr' } };
   const [hydrated] = hydrate({ roots: ['e1'], entries: { e1: entry }, unresolved: {} });
 
@@ -50,7 +54,8 @@ test('system keys sit beside the fields, and a field named like one is untouched
   });
 });
 
-test('each root has its own tree, so a root met on another root\'s path is not cut short', () => {
+test('each root has its own tree, so a root met on another root\'s path is not cut short', () =>
+{
   // The page is chain-3, chain-2, chain-1, each linking to the next round the loop.
   const items = hydrate(graph('entries-ordered'), shape);
   assert.deepEqual(items.map((item) => item._slug), ['chain-3', 'chain-2', 'chain-1']);
@@ -61,7 +66,8 @@ test('each root has its own tree, so a root met on another root\'s path is not c
   assert.ok(isResolved(fromTwo));
 });
 
-test('a field the type always has, missing from an entry, is reported once per entry, and the entry is still returned', () => {
+test('a field the type always has, missing from an entry, is reported once per entry, and the entry is still returned', () =>
+{
   const issues: Issue[] = [];
   const strict: Shape = { article: { links: { related: 'many' }, always: ['body'] } };
 
@@ -76,7 +82,8 @@ test('a field the type always has, missing from an entry, is reported once per e
   assert.equal(issues[0]?.message.includes("has no 'body'"), true);
 });
 
-test('a link delivery neither returned nor reported is reported, and becomes an absent stub', () => {
+test('a link delivery neither returned nor reported is reported, and becomes an absent stub', () =>
+{
   const issues: Issue[] = [];
   const unlisted: EntryGraph = {
     roots: ['a'],
@@ -90,7 +97,8 @@ test('a link delivery neither returned nor reported is reported, and becomes an 
   assert.deepEqual(issues.map((issue) => issue.kind), ['unlisted-link']);
 });
 
-test('one link where the type has many is reported, and passed through', () => {
+test('one link where the type has many is reported, and passed through', () =>
+{
   const issues: Issue[] = [];
   const single: EntryGraph = {
     roots: [C1],
@@ -104,7 +112,8 @@ test('one link where the type has many is reported, and passed through', () => {
   assert.deepEqual(issues.map((issue) => issue.kind), ['unexpected-value']);
 });
 
-test('a null link stays null and is not reported', () => {
+test('a null link stays null and is not reported', () =>
+{
   const issues: Issue[] = [];
   const empty: EntryGraph = {
     roots: ['a'],
@@ -118,7 +127,8 @@ test('a null link stays null and is not reported', () => {
   assert.deepEqual(issues, []);
 });
 
-test('isResolved tells a target from a stub', () => {
+test('isResolved tells a target from a stub', () =>
+{
   assert.equal(isResolved({ _id: C3, _unresolved: 'depth' }), false);
   assert.equal(isResolved({ _id: C3, _type: 'article', _slug: 'chain-3' }), true);
 });

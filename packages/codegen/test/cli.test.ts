@@ -14,21 +14,24 @@ const MODEL = fileURLToPath(new URL('../../../spec/type-model/fixtures/cli-next-
 const EXPECTED = fileURLToPath(new URL('./expected/cli-next-blog/index.ts', import.meta.url));
 
 /** Runs the CLI in [dir], without COHO_TOKEN unless [env] gives one. */
-function run(dir: string, args: string[], env: Record<string, string> = {}) {
+function run(dir: string, args: string[], env: Record<string, string> = {})
+{
   const inherited = { ...process.env };
   delete inherited['COHO_TOKEN'];
   return spawnSync(process.execPath, [CLI, ...args], { cwd: dir, encoding: 'utf8', env: { ...inherited, ...env } });
 }
 
 /** A library's directory: a config and a pulled type model. */
-function library(): string {
+function library(): string
+{
   const dir = mkdtempSync(join(tmpdir(), 'coho-library-'));
   writeFileSync(join(dir, 'coho.config.json'), JSON.stringify({ project: 'p1', ref: 'v1.0.0' }));
   copyFileSync(MODEL, join(dir, 'coho-ir.json'));
   return dir;
 }
 
-test('generate writes the module, and check passes until it is edited', () => {
+test('generate writes the module, and check passes until it is edited', () =>
+{
   const dir = library();
 
   const generated = run(dir, ['generate']);
@@ -43,14 +46,16 @@ test('generate writes the module, and check passes until it is edited', () => {
   assert.match(checked.stderr, /run coho-codegen generate/);
 });
 
-test('pull without COHO_TOKEN is refused before anything is asked', () => {
+test('pull without COHO_TOKEN is refused before anything is asked', () =>
+{
   const pulled = run(library(), ['pull']);
 
   assert.equal(pulled.status, 1);
   assert.match(pulled.stderr, /COHO_TOKEN is not set/);
 });
 
-test('pull takes the token from a .env beside the config when the environment has none', () => {
+test('pull takes the token from a .env beside the config when the environment has none', () =>
+{
   const dir = library();
   writeFileSync(join(dir, '.env'), 'COHO_TOKEN=coho_pt_from_file\n');
 
@@ -60,9 +65,11 @@ test('pull takes the token from a .env beside the config when the environment ha
   assert.match(pulled.stderr, /pull needs url, account, project and ref/);
 });
 
-test('--ref pulls another ref than the config names', async () => {
+test('--ref pulls another ref than the config names', async () =>
+{
   const asked: string[] = [];
-  const server = createServer((request, response) => {
+  const server = createServer((request, response) =>
+  {
     asked.push(request.url ?? '');
     response.writeHead(200, { 'content-type': 'application/json' });
     response.end(readFileSync(MODEL));
@@ -70,7 +77,8 @@ test('--ref pulls another ref than the config names', async () => {
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
 
-  try {
+  try
+  {
     const dir = library();
     const { port } = server.address() as AddressInfo;
     writeFileSync(join(dir, 'coho.config.json'), JSON.stringify({ url: `http://127.0.0.1:${port}`, account: 'a', project: 'p1', ref: 'v1.0.0' }));
@@ -81,12 +89,15 @@ test('--ref pulls another ref than the config names', async () => {
 
     assert.equal(code, 0);
     assert.deepEqual(asked, ['/api/v1/accounts/a/projects/p1/refs/v2.0.0/type-model']);
-  } finally {
+  }
+  finally
+  {
     server.close();
   }
 });
 
-test('no command is a usage error, and --help is not', () => {
+test('no command is a usage error, and --help is not', () =>
+{
   const dir = library();
 
   assert.equal(run(dir, []).status, 1);

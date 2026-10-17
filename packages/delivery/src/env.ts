@@ -23,14 +23,17 @@ export type Env = Readonly<Record<string, string | undefined>>;
  * ⚠️ Server-side only. Never give these a prefix that puts them in a browser bundle,
  * such as Next.js's `NEXT_PUBLIC_`.
  */
-export function configFromEnv(env: Env): ContentConfig {
-  const value = (name: string): string | undefined => {
+export function configFromEnv(env: Env): ContentConfig
+{
+  const value = (name: string): string | undefined =>
+  {
     const set = env[name]?.trim();
     return set === undefined || set === '' ? undefined : set;
   };
   const token = value('COHO_PREVIEW_TOKEN');
   const key = value('COHO_DELIVERY_KEY');
-  if (token !== undefined && key !== undefined) {
+  if (token !== undefined && key !== undefined)
+  {
     throw new Error('Coho: set COHO_PREVIEW_TOKEN to preview unreleased content, or COHO_DELIVERY_KEY to read released content, not both');
   }
 
@@ -38,7 +41,8 @@ export function configFromEnv(env: Env): ContentConfig {
     ? ['COHO_URL', 'COHO_ACCOUNT', 'COHO_PROJECT', 'COHO_REF']
     : ['COHO_DELIVERY_URL', 'COHO_PROJECT', 'COHO_REF'];
   const missing = needed.filter((name) => value(name) === undefined);
-  if (missing.length > 0) {
+  if (missing.length > 0)
+  {
     const reading = token !== undefined ? 'a preview, since COHO_PREVIEW_TOKEN is set' : 'released content';
     throw new Error(`Coho: ${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} needed to read ${reading}`);
   }

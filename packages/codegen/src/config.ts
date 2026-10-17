@@ -6,7 +6,8 @@ import { CodegenError } from './model.ts';
  * `coho.config.json`. Paths are relative to the file. The token is never here: `pull`
  * reads it from `COHO_TOKEN`, so the file can be committed.
  */
-export interface CodegenConfig {
+export interface CodegenConfig
+{
   /** The Coho API's origin, such as `https://app.coho.example`. Only `pull` needs it. */
   readonly url?: string;
   /** The account id. */
@@ -20,7 +21,8 @@ export interface CodegenConfig {
   readonly outDir?: string;
 }
 
-export interface Loaded {
+export interface Loaded
+{
   readonly config: CodegenConfig;
   /** The type model file, resolved. */
   readonly typeModel: string;
@@ -28,14 +30,19 @@ export interface Loaded {
   readonly outDir: string;
 }
 
-export function loadConfig(file: string): Loaded {
+export function loadConfig(file: string): Loaded
+{
   let config: unknown;
-  try {
+  try
+  {
     config = JSON.parse(readFileSync(file, 'utf8'));
-  } catch (error) {
+  }
+  catch (error)
+  {
     throw new CodegenError(`Cannot read ${file}: ${error instanceof Error ? error.message : String(error)}`);
   }
-  if (typeof config !== 'object' || config === null || Array.isArray(config)) {
+  if (typeof config !== 'object' || config === null || Array.isArray(config))
+  {
     throw new CodegenError(`${file} is not a JSON object`);
   }
   const loaded = config as CodegenConfig;

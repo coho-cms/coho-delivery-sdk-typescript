@@ -10,15 +10,18 @@ const MODEL = readFileSync(new URL('../../../spec/type-model/fixtures/cli-next-b
 
 const temp = (): string => mkdtempSync(join(tmpdir(), 'coho-codegen-'));
 
-interface Call {
+interface Call
+{
   readonly url: string;
   readonly headers: Record<string, string>;
 }
 
 /** A fetch that answers every request with `answer()`, recording what it was asked. */
-function server(answer: (call: Call) => Response): { fetch: typeof globalThis.fetch; calls: Call[] } {
+function server(answer: (call: Call) => Response): { fetch: typeof globalThis.fetch; calls: Call[] }
+{
   const calls: Call[] = [];
-  const fetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+  const fetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> =>
+  {
     const call = { url: String(input), headers: Object.fromEntries(new Headers(init?.headers).entries()) };
     calls.push(call);
     return answer(call);
@@ -32,7 +35,8 @@ const config = { url: 'https://app.test/', account: 'acme', project: 'p1', ref: 
 /* PULL */
 /* PULL */
 
-test('pull asks the BFF for the ref\'s type model with the token, and writes it as it arrived', async () => {
+test('pull asks the BFF for the ref\'s type model with the token, and writes it as it arrived', async () =>
+{
   const path = join(temp(), 'coho-ir.json');
   const { fetch, calls } = server(() => new Response(MODEL, { status: 200 }));
 
@@ -45,7 +49,8 @@ test('pull asks the BFF for the ref\'s type model with the token, and writes it 
   assert.deepEqual(readFileSync(path), MODEL);
 });
 
-test('pull asks whether the model changed with the file\'s hash, and a 304 leaves it alone', async () => {
+test('pull asks whether the model changed with the file\'s hash, and a 304 leaves it alone', async () =>
+{
   const path = join(temp(), 'coho-ir.json');
   writeFileSync(path, MODEL);
   const { fetch, calls } = server(() => new Response(null, { status: 304 }));
@@ -57,7 +62,8 @@ test('pull asks whether the model changed with the file\'s hash, and a 304 leave
   assert.deepEqual(readFileSync(path), MODEL);
 });
 
-test('a refused pull says why, and points at the token', async () => {
+test('a refused pull says why, and points at the token', async () =>
+{
   const problem = JSON.stringify({ code: 'FORBIDDEN', title: 'Forbidden', status: 403, detail: "Requires 'content:read'" });
   const { fetch } = server(() => new Response(problem, { status: 403, headers: { 'content-type': 'application/problem+json' } }));
 
@@ -67,7 +73,8 @@ test('a refused pull says why, and points at the token', async () => {
   );
 });
 
-test('a model this generator cannot read is refused before anything is written', async () => {
+test('a model this generator cannot read is refused before anything is written', async () =>
+{
   const path = join(temp(), 'coho-ir.json');
   writeFileSync(path, MODEL);
   const newer = JSON.stringify({ irVersion: '2.0', source: {}, types: {} });
@@ -77,7 +84,8 @@ test('a model this generator cannot read is refused before anything is written',
   assert.deepEqual(readFileSync(path), MODEL);
 });
 
-test('pull needs the whole address in the config', async () => {
+test('pull needs the whole address in the config', async () =>
+{
   await assert.rejects(pull({ project: 'p1' }, join(temp(), 'm.json'), { token: 't' }), /needs url, account, project and ref/);
 });
 
@@ -85,7 +93,8 @@ test('pull needs the whole address in the config', async () => {
 /* GENERATED FILES */
 /* GENERATED FILES */
 
-test('drift is empty for what was written, and names each kind of difference', () => {
+test('drift is empty for what was written, and names each kind of difference', () =>
+{
   const out = join(temp(), 'src', 'coho');
   const files = [{ path: 'index.ts', contents: 'export {};\n' }];
 
@@ -102,11 +111,13 @@ test('drift is empty for what was written, and names each kind of difference', (
   assert.deepEqual(drift(files, join(temp(), 'nowhere')), ['index.ts is missing']);
 });
 
-test('a missing type model says to pull it', () => {
+test('a missing type model says to pull it', () =>
+{
   assert.throws(() => readTypeModelFile(join(temp(), 'coho-ir.json')), /run coho-codegen pull/);
 });
 
-test('the config\'s paths are relative to it, with defaults', () => {
+test('the config\'s paths are relative to it, with defaults', () =>
+{
   const dir = temp();
   mkdirSync(join(dir, 'lib'));
   writeFileSync(join(dir, 'lib', 'coho.config.json'), JSON.stringify({ project: 'p1', outDir: 'generated' }));

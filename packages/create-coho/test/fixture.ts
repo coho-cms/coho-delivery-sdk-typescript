@@ -13,7 +13,8 @@ export const VERSION = (JSON.parse(readFileSync(new URL('../package.json', impor
  * a developer's `.env` with their token in it. Its SDK is at an old version, so pinning
  * has something to replace.
  */
-export function template(options: { npmrc?: boolean } = {}): string {
+export function template(options: { npmrc?: boolean } = {}): string
+{
   const dir = join(temp(), 'coho-template-typescript');
   const files: Record<string, string> = {
     'package.json': JSON.stringify(
@@ -46,7 +47,8 @@ export function template(options: { npmrc?: boolean } = {}): string {
   };
   if (options.npmrc === true) files['.npmrc'] = 'engine-strict=true\n';
 
-  for (const [path, contents] of Object.entries(files)) {
+  for (const [path, contents] of Object.entries(files))
+  {
     mkdirSync(join(dir, path, '..'), { recursive: true });
     writeFileSync(join(dir, path), contents);
   }

@@ -8,7 +8,8 @@ export type LinkKind = 'one' | 'many';
  * from the type model. Untyped callers may write one by hand, or pass none, in
  * which case references stay ids.
  */
-export interface TypeShape {
+export interface TypeShape
+{
   /** The reference fields, by field id. */
   readonly links?: Readonly<Record<string, LinkKind>>;
   /** The fields delivery always includes: required, and not localized. */
@@ -22,7 +23,8 @@ export type Shape = Readonly<Record<string, TypeShape>>;
  * The system keys on every hydrated entry. A field id cannot begin with `_`, so
  * these can never collide with a field, whatever a type declares.
  */
-export interface EntryBase<T extends string = string> {
+export interface EntryBase<T extends string = string>
+{
   readonly _id: string;
   readonly _type: T;
   readonly _slug: string;
@@ -34,7 +36,8 @@ export interface EntryBase<T extends string = string> {
 export type HydratedEntry = EntryBase & { readonly [field: string]: unknown };
 
 /** Where a reference's target would be, and why it is not. */
-export interface Unresolved {
+export interface Unresolved
+{
   readonly _id: string;
   /**
    * `depth` and `absent` as delivery reports them: beyond the requested depth, or
@@ -46,12 +49,14 @@ export interface Unresolved {
 /** A reference: its target, or a stub saying why the target is not here. */
 export type Linked<T> = T | Unresolved;
 
-export function isResolved<T>(value: Linked<T>): value is T {
+export function isResolved<T>(value: Linked<T>): value is T
+{
   return !(typeof value === 'object' && value !== null && '_unresolved' in value);
 }
 
 /** Something about an entry that its type says cannot happen. Reported, never thrown. */
-export interface Issue {
+export interface Issue
+{
   /**
    * `missing-field`: a field the type always has is absent, as old entries are after
    * a field becomes required. `unexpected-value`: one link where the type says many,
@@ -66,7 +71,8 @@ export interface Issue {
   readonly message: string;
 }
 
-export interface HydrateOptions {
+export interface HydrateOptions
+{
   /** Called once for each issue found. Defaults to `console.warn`. */
   readonly onIssue?: (issue: Issue) => void;
 }
@@ -80,24 +86,28 @@ export interface HydrateOptions {
  * Within a pass an entry is built once and shared, and a link back to an entry
  * still being built becomes a `cycle` stub, which is what keeps the result acyclic.
  */
-export function hydrate(graph: EntryGraph, shape: Shape = {}, options: HydrateOptions = {}): HydratedEntry[] {
+export function hydrate(graph: EntryGraph, shape: Shape = {}, options: HydrateOptions = {}): HydratedEntry[]
+{
   const onIssue = options.onIssue ?? warn;
   const reported = new Set<string>();
-  const report = (kind: Issue['kind'], entry: Entry, field: string, what: string): void => {
+  const report = (kind: Issue['kind'], entry: Entry, field: string, what: string): void =>
+  {
     const key = `${kind} ${entry.id} ${field}`;
     if (reported.has(key)) return;
     reported.add(key);
     onIssue({ kind, id: entry.id, slug: entry.slug, type: entry.type, field, message: `${entry.type} '${entry.slug}' ${what}` });
   };
 
-  return graph.roots.flatMap((rootId) => {
+  return graph.roots.flatMap((rootId) =>
+  {
     const root = graph.entries[rootId];
     if (root === undefined) return [];
 
     const built = new Map<string, HydratedEntry>();
     const building = new Set<string>();
 
-    const follow = (from: Entry, field: string, value: unknown): unknown => {
+    const follow = (from: Entry, field: string, value: unknown): unknown =>
+    {
       // Not an id: left as delivery sent it.
       if (typeof value !== 'string') return value;
       const done = built.get(value);
@@ -106,30 +116,35 @@ export function hydrate(graph: EntryGraph, shape: Shape = {}, options: HydrateOp
       const target = graph.entries[value];
       if (target !== undefined) return build(target);
       const reason = graph.unresolved[value];
-      if (reason === undefined) {
+      if (reason === undefined)
+      {
         report('unlisted-link', from, field, `links '${field}' to ${value}, which delivery neither returned nor reported`);
       }
       return stub(value, reason ?? 'absent');
     };
 
-    const build = (entry: Entry): HydratedEntry => {
+    const build = (entry: Entry): HydratedEntry =>
+    {
       building.add(entry.id);
       const type = shape[entry.type];
       const out: Record<string, unknown> = { _id: entry.id, _type: entry.type, _slug: entry.slug };
       if (entry.locale !== undefined) out['_locale'] = entry.locale;
 
-      for (const [field, value] of Object.entries(entry.fields)) {
+      for (const [field, value] of Object.entries(entry.fields))
+      {
         const kind = type?.links?.[field];
         if (kind === undefined || value === null) out[field] = value;
         else if (kind === 'many' && Array.isArray(value)) out[field] = value.map((id) => follow(entry, field, id));
         else if (kind === 'one' && !Array.isArray(value)) out[field] = follow(entry, field, value);
-        else {
+        else
+        {
           report('unexpected-value', entry, field, `has ${kind === 'many' ? 'one link' : 'several links'} in '${field}', where its type has ${kind === 'many' ? 'several' : 'one'}`);
           out[field] = value;
         }
       }
 
-      for (const field of type?.always ?? []) {
+      for (const field of type?.always ?? [])
+      {
         if (!(field in entry.fields)) report('missing-field', entry, field, `has no '${field}', which its type requires`);
       }
 
@@ -143,10 +158,12 @@ export function hydrate(graph: EntryGraph, shape: Shape = {}, options: HydrateOp
   });
 }
 
-function stub(id: string, reason: Unresolved['_unresolved']): Unresolved {
+function stub(id: string, reason: Unresolved['_unresolved']): Unresolved
+{
   return { _id: id, _unresolved: reason };
 }
 
-function warn(issue: Issue): void {
+function warn(issue: Issue): void
+{
   console.warn(`[coho] ${issue.message}`);
 }

@@ -11,13 +11,15 @@ import type { Problem } from './types.ts';
  * `USER_SUSPENDED`. An answer that is not a problem document, such as a proxy's error
  * page, has the code `UNEXPECTED_RESPONSE`.
  */
-export class CohoDeliveryError extends Error {
+export class CohoDeliveryError extends Error
+{
   readonly status: number;
   readonly code: string;
   /** The problem document as the server sent it, when there was one. */
   readonly problem: Problem | undefined;
 
-  constructor(status: number, code: string, message: string, problem?: Problem) {
+  constructor(status: number, code: string, message: string, problem?: Problem)
+  {
     super(message);
     this.name = 'CohoDeliveryError';
     this.status = status;

@@ -30,7 +30,8 @@ Options:
   -y, --yes          Ask nothing: use what is given, and placeholders for the rest
   -h, --help`;
 
-async function main(argv: string[]): Promise<number> {
+async function main(argv: string[]): Promise<number>
+{
   const { values, positionals } = parseArgs({
     args: argv,
     allowPositionals: true,
@@ -45,7 +46,8 @@ async function main(argv: string[]): Promise<number> {
       help: { type: 'boolean', short: 'h' },
     },
   });
-  if (values.help === true) {
+  if (values.help === true)
+  {
     console.log(USAGE);
     return 0;
   }
@@ -57,24 +59,30 @@ async function main(argv: string[]): Promise<number> {
   // muted, so a token is not echoed as it is typed or pasted.
   let muted = false;
   const output = new Writable({
-    write(chunk, encoding, done) {
+    write(chunk, encoding, done)
+    {
       if (!muted) process.stdout.write(chunk, encoding);
       done();
     },
   });
   const prompt = process.stdin.isTTY === true && values.yes !== true ? createInterface({ input: process.stdin, output, terminal: true }) : undefined;
-  const ask = async (question: string, fallback: string): Promise<string> => {
+  const ask = async (question: string, fallback: string): Promise<string> =>
+  {
     if (prompt === undefined) return fallback;
     const answer = (await prompt.question(`${question}${fallback === '' ? '' : ` (${fallback})`}: `)).trim();
     return answer === '' ? fallback : answer;
   };
-  const askSecret = async (question: string): Promise<string> => {
+  const askSecret = async (question: string): Promise<string> =>
+  {
     if (prompt === undefined) return '';
     process.stdout.write(`${question}: `);
     muted = true;
-    try {
+    try
+    {
       return (await prompt.question('')).trim();
-    } finally {
+    }
+    finally
+    {
       muted = false;
       process.stdout.write('\n');
     }
@@ -84,7 +92,8 @@ async function main(argv: string[]): Promise<number> {
   let target: string;
   let token: string;
   let described: TokenDescription | undefined;
-  try {
+  try
+  {
     target = resolve(positionals[0] ?? (await ask('Directory', 'content')));
     if (!isFree(target)) throw new CreateError(`${shown(target)} already has files in it`);
 
@@ -105,26 +114,33 @@ async function main(argv: string[]): Promise<number> {
       project: described?.project.id,
       ref: values.ref ?? (await ask('Tag to generate from', '')),
     };
-  } finally {
+  }
+  finally
+  {
     prompt?.close();
   }
 
   const template = bundled ?? (await resolveTemplate(values.template ?? ''));
-  try {
+  try
+  {
     copyTemplate(template.dir, target);
     restoreDotfiles(target);
     customize(target, answers);
     pinSdk(target, VERSION);
     if (token !== '') writeEnv(target, token);
-  } finally {
+  }
+  finally
+  {
     template.cleanup();
   }
   console.log(`Created ${answers.name} in ${shown(target)}, from ${template.from}, on @coho-cms ${VERSION}.`);
-  if (described !== undefined) {
+  if (described !== undefined)
+  {
     const account = described.account.name ?? described.account.id;
     console.log(`It reads ${described.project.name}, in ${account}, with the token in .env.`);
     // The library only reads types; a token that can do more is more to lose if it leaks.
-    if (described.token.role !== 'viewer') {
+    if (described.token.role !== 'viewer')
+    {
       console.log(`That token is a ${described.token.role}. The library only reads, so a viewer token is enough: coho token create --role viewer`);
     }
   }
@@ -143,29 +159,34 @@ async function main(argv: string[]): Promise<number> {
 }
 
 /** Runs npm install in [dir], and says whether it worked. */
-function install(dir: string): boolean {
+function install(dir: string): boolean
+{
   console.log('\nInstalling…');
   // `npm create` runs this through npm, which says where its own CLI is. Otherwise npm is on the PATH.
   const npm = process.env['npm_execpath'];
   const result = npm !== undefined && npm.endsWith('.js')
     ? spawnSync(process.execPath, [npm, 'install'], { cwd: dir, stdio: 'inherit' })
     : spawnSync('npm', ['install'], { cwd: dir, stdio: 'inherit', shell: process.platform === 'win32' });
-  if (result.status !== 0) {
+  if (result.status !== 0)
+  {
     console.log('npm install failed. The library is created; run npm install in it once that is fixed.');
     return false;
   }
   return true;
 }
 
-function shown(path: string): string {
+function shown(path: string): string
+{
   return relative(process.cwd(), path) || '.';
 }
 
 main(process.argv.slice(2)).then(
-  (code) => {
+  (code) =>
+  {
     process.exitCode = code;
   },
-  (error: unknown) => {
+  (error: unknown) =>
+  {
     // A CreateError is something to fix; anything else is a bug, and its stack helps.
     console.error(`error: ${error instanceof CreateError ? error.message : error instanceof Error ? (error.stack ?? error.message) : String(error)}`);
     process.exitCode = 1;

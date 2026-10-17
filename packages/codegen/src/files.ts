@@ -7,12 +7,14 @@ import { CodegenError, readTypeModel } from './model.ts';
 import type { TypeModel } from './model.ts';
 
 /** The type model in [path], read and checked. */
-export function readTypeModelFile(path: string): TypeModel {
+export function readTypeModelFile(path: string): TypeModel
+{
   if (!existsSync(path)) throw new CodegenError(`No type model at ${path}: run coho-codegen pull`);
   return parse(readFileSync(path, 'utf8'), path);
 }
 
-export interface PullOptions {
+export interface PullOptions
+{
   /** A project token with read access. */
   readonly token: string;
   readonly fetch?: typeof globalThis.fetch;
@@ -28,9 +30,11 @@ export interface PullOptions {
  *
  * @returns whether the file changed, and the model it now holds
  */
-export async function pull(config: CodegenConfig, path: string, options: PullOptions): Promise<{ changed: boolean; model: TypeModel }> {
+export async function pull(config: CodegenConfig, path: string, options: PullOptions): Promise<{ changed: boolean; model: TypeModel }>
+{
   const { url, account, project, ref } = config;
-  if (url === undefined || account === undefined || project === undefined || ref === undefined) {
+  if (url === undefined || account === undefined || project === undefined || ref === undefined)
+  {
     throw new CodegenError('pull needs url, account, project and ref in the config');
   }
   const endpoint = `${url.replace(/\/+$/, '')}/api/v1/accounts/${encodeURIComponent(account)}/projects/` +
@@ -55,7 +59,8 @@ export async function pull(config: CodegenConfig, path: string, options: PullOpt
 }
 
 /** Writes [files] into [outDir]. */
-export function write(files: readonly GeneratedFile[], outDir: string): void {
+export function write(files: readonly GeneratedFile[], outDir: string): void
+{
   mkdirSync(outDir, { recursive: true });
   for (const file of files) writeFileSync(join(outDir, file.path), file.contents);
 }
@@ -64,37 +69,49 @@ export function write(files: readonly GeneratedFile[], outDir: string): void {
  * How [outDir] differs from [files]: each file missing or different, and each file
  * there that nothing generates. Empty when the generated code is up to date.
  */
-export function drift(files: readonly GeneratedFile[], outDir: string): string[] {
+export function drift(files: readonly GeneratedFile[], outDir: string): string[]
+{
   const problems: string[] = [];
-  for (const file of files) {
+  for (const file of files)
+  {
     const path = join(outDir, file.path);
     if (!existsSync(path)) problems.push(`${file.path} is missing`);
     else if (readFileSync(path, 'utf8') !== file.contents) problems.push(`${file.path} differs from what the type model generates`);
   }
-  if (existsSync(outDir)) {
-    for (const name of readdirSync(outDir)) {
+  if (existsSync(outDir))
+  {
+    for (const name of readdirSync(outDir))
+    {
       if (!files.some((file) => file.path === name)) problems.push(`${name} is in the output directory, but nothing generates it`);
     }
   }
   return problems;
 }
 
-function parse(text: string, from: string): TypeModel {
+function parse(text: string, from: string): TypeModel
+{
   let json: unknown;
-  try {
+  try
+  {
     json = JSON.parse(text);
-  } catch {
+  }
+  catch
+  {
     throw new CodegenError(`${from} is not JSON`);
   }
   return readTypeModel(json);
 }
 
-async function failure(response: Response): Promise<string> {
+async function failure(response: Response): Promise<string>
+{
   let detail = '';
-  try {
+  try
+  {
     const problem = (await response.json()) as { code?: unknown; detail?: unknown; title?: unknown };
     detail = [problem.code, problem.detail ?? problem.title].filter((part) => typeof part === 'string').join(': ');
-  } catch {
+  }
+  catch
+  {
     // Not a problem document; the status says enough.
   }
   const hint = response.status === 401 || response.status === 403 ? ' Check COHO_TOKEN: it needs read access to the project.' : '';

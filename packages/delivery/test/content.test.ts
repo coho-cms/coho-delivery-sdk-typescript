@@ -9,7 +9,8 @@ const C3 = '00000000-0000-7000-8000-0000000000c3';
 const ABSENT = '00000000-0000-7000-8000-0000000000ff';
 
 /** What generated code would declare for the recordings' `article` type. */
-interface Article extends EntryBase<'article'> {
+interface Article extends EntryBase<'article'>
+{
   readonly title?: string;
   readonly body?: string;
   readonly rank?: number;
@@ -18,7 +19,8 @@ interface Article extends EntryBase<'article'> {
 
 const shape: Shape = { article: { links: { related: 'many' } } };
 
-function content(options: { shape?: Shape; onIssue?: (issue: Issue) => void; locale?: string } = {}) {
+function content(options: { shape?: Shape; onIssue?: (issue: Issue) => void; locale?: string } = {})
+{
   const { fetch, calls } = replay();
   const locale = 'locale' in options ? options.locale : 'en-US';
   const client = createContentClient(
@@ -28,7 +30,8 @@ function content(options: { shape?: Shape; onIssue?: (issue: Issue) => void; loc
   return { client, calls, articles: client.type<Article, 'rank'>('article') };
 }
 
-test('a typed read is hydrated', async () => {
+test('a typed read is hydrated', async () =>
+{
   const { articles } = content();
 
   const chain = await articles.bySlug('chain-1', { depth: 2 });
@@ -39,7 +42,8 @@ test('a typed read is hydrated', async () => {
   assert.equal(next.title, 'Chain 2');
 });
 
-test('a slug of another type is null, the same as no entry', async () => {
+test('a slug of another type is null, the same as no entry', async () =>
+{
   const { client } = content();
   assert.equal(await client.type('page').bySlug('chain-1', { depth: 2 }), null);
 
@@ -48,7 +52,8 @@ test('a slug of another type is null, the same as no entry', async () => {
   assert.equal(await bare.client.type('article').bySlug('nope'), null);
 });
 
-test('the configured locale is sent, unless a read names its own', async () => {
+test('the configured locale is sent, unless a read names its own', async () =>
+{
   const { articles, calls } = content();
 
   const chain = await articles.byId(C3, { depth: 1, locale: 'de-DE' });
@@ -57,7 +62,8 @@ test('the configured locale is sent, unless a read names its own', async () => {
   assert.match(calls[0]?.url ?? '', /locale=de-DE/);
 });
 
-test('a list keeps the page order and hasMore, and hydrates each item', async () => {
+test('a list keeps the page order and hasMore, and hydrates each item', async () =>
+{
   const { articles } = content();
 
   const page = await articles.list({ order: '-rank', limit: 3 });
@@ -66,7 +72,8 @@ test('a list keeps the page order and hasMore, and hydrates each item', async ()
   assert.equal(page.hasMore, true);
 });
 
-test('byIds leaves out the ids that are not on the ref', async () => {
+test('byIds leaves out the ids that are not on the ref', async () =>
+{
   const { client } = content();
 
   const found = await client.byIds([C2, ABSENT]);
@@ -74,7 +81,8 @@ test('byIds leaves out the ids that are not on the ref', async () => {
   assert.deepEqual(found.map((entry) => entry._slug), ['chain-2']);
 });
 
-test('an issue is reported once for the life of the client, not once per read', async () => {
+test('an issue is reported once for the life of the client, not once per read', async () =>
+{
   const issues: Issue[] = [];
   const { articles } = content({
     shape: { article: { links: { related: 'many' }, always: ['body'] } },

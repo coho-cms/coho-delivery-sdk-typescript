@@ -6,7 +6,8 @@
  * know, which is what lets a minor version add them.
  */
 
-export interface TypeModel {
+export interface TypeModel
+{
   readonly irVersion: string;
   readonly source: Source;
   /** Content types by slug. */
@@ -14,7 +15,8 @@ export interface TypeModel {
   readonly warnings?: readonly ModelWarning[];
 }
 
-export interface Source {
+export interface Source
+{
   readonly project: string;
   /** The branch or tag the types came from. */
   readonly ref: string;
@@ -23,14 +25,16 @@ export interface Source {
   readonly schemaHash: string;
 }
 
-export interface ContentType {
+export interface ContentType
+{
   readonly slug: string;
   readonly name: string;
   readonly version: string;
   readonly fields: readonly Field[];
 }
 
-export interface Field {
+export interface Field
+{
   readonly id: string;
   readonly name: string;
   /** Open: a kind added after this generator was written is emitted untyped. */
@@ -49,7 +53,8 @@ export interface Field {
   readonly max?: number;
 }
 
-export interface ModelWarning {
+export interface ModelWarning
+{
   readonly type: string;
   readonly field: string;
   readonly message: string;
@@ -59,8 +64,10 @@ export interface ModelWarning {
 export const SUPPORTED_MAJOR = 1;
 
 /** A type model, a configuration or a server answer the generator cannot use. */
-export class CodegenError extends Error {
-  constructor(message: string) {
+export class CodegenError extends Error
+{
+  constructor(message: string)
+  {
     super(message);
     this.name = 'CodegenError';
   }
@@ -71,28 +78,34 @@ export class CodegenError extends Error {
  * unknown major version is refused: the shape may mean something this generator
  * cannot know.
  */
-export function readTypeModel(json: unknown): TypeModel {
+export function readTypeModel(json: unknown): TypeModel
+{
   if (!isObject(json)) throw new CodegenError('The type model is not a JSON object');
 
   const version = json['irVersion'];
-  if (typeof version !== 'string' || !/^\d+\.\d+$/.test(version)) {
+  if (typeof version !== 'string' || !/^\d+\.\d+$/.test(version))
+  {
     throw new CodegenError(`The type model has no valid irVersion: ${JSON.stringify(version)}`);
   }
   const major = Number(version.split('.')[0]);
-  if (major !== SUPPORTED_MAJOR) {
+  if (major !== SUPPORTED_MAJOR)
+  {
     throw new CodegenError(`The type model is version ${version}; this generator reads ${SUPPORTED_MAJOR}.x. Upgrade @coho-cms/codegen.`);
   }
 
   if (!isObject(json['source'])) throw new CodegenError('The type model has no source');
   if (!isObject(json['types'])) throw new CodegenError('The type model has no types');
-  for (const [slug, type] of Object.entries(json['types'])) {
-    if (!isObject(type) || !Array.isArray(type['fields'])) {
+  for (const [slug, type] of Object.entries(json['types']))
+  {
+    if (!isObject(type) || !Array.isArray(type['fields']))
+    {
       throw new CodegenError(`Type '${slug}' in the type model has no fields`);
     }
   }
   return json as unknown as TypeModel;
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
+function isObject(value: unknown): value is Record<string, unknown>
+{
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

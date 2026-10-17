@@ -5,7 +5,8 @@ import type { HydratedEntry, Issue, Shape } from './hydrate.ts';
 import type { EntryGraph } from './types.ts';
 
 /** What a content client reads, on top of where it reads it from. */
-export interface ContentOptions {
+export interface ContentOptions
+{
   /**
    * The ref to read: an environment such as `prod`, or a tag. With a project token,
    * a branch, or an environment pointing at one such as `dev`.
@@ -20,12 +21,14 @@ export interface ContentOptions {
 export type ContentConfig = DeliveryConfig & ContentOptions;
 
 /** A page of hydrated entries. */
-export interface Page<T> {
+export interface Page<T>
+{
   readonly items: readonly T[];
   readonly hasMore: boolean;
 }
 
-export interface TypeListOptions<O extends string> extends ReadOptions {
+export interface TypeListOptions<O extends string> extends ReadOptions
+{
   /** A sortable field of the type, prefixed `-` for descending. */
   readonly order?: O | `-${O}`;
   readonly limit?: number;
@@ -33,7 +36,8 @@ export interface TypeListOptions<O extends string> extends ReadOptions {
 }
 
 /** Reads of one content type, hydrated as `T`. `O` names its sortable fields. */
-export interface TypeReader<T = HydratedEntry, O extends string = string> {
+export interface TypeReader<T = HydratedEntry, O extends string = string>
+{
   /** The entry with this slug, or null if there is none or it is of another type. */
   bySlug(slug: string, options?: ReadOptions): Promise<T | null>;
   /** The entry with this id, or null if there is none or it is of another type. */
@@ -45,7 +49,8 @@ export interface TypeReader<T = HydratedEntry, O extends string = string> {
  * Hydrated reads on one ref. What generated code builds its typed client from, so
  * that the logic lives in this package and reaches every library with an update.
  */
-export interface ContentClient<Any = HydratedEntry> {
+export interface ContentClient<Any = HydratedEntry>
+{
   /** The untyped client underneath, for anything the hydrated reads do not cover. */
   readonly delivery: DeliveryClient;
   /** The entry with this slug, whatever its type, or null. */
@@ -61,14 +66,16 @@ export interface ContentClient<Any = HydratedEntry> {
   type<T = HydratedEntry, O extends string = string>(slug: string): TypeReader<T, O>;
 }
 
-export function createContentClient<Any = HydratedEntry>(config: ContentConfig, shape: Shape = {}): ContentClient<Any> {
+export function createContentClient<Any = HydratedEntry>(config: ContentConfig, shape: Shape = {}): ContentClient<Any>
+{
   const delivery = createDeliveryClient(config);
 
   // Once per issue for the life of the client rather than per read, so a page
   // rendered a thousand times reports its broken entry once.
   const onIssue = config.onIssue ?? ((issue: Issue) => console.warn(`[coho] ${issue.message}`));
   const reported = new Set<string>();
-  const report = (issue: Issue): void => {
+  const report = (issue: Issue): void =>
+  {
     const key = `${issue.kind} ${issue.id} ${issue.field}`;
     if (reported.has(key)) return;
     reported.add(key);
@@ -85,13 +92,15 @@ export function createContentClient<Any = HydratedEntry>(config: ContentConfig, 
     byId: async (id, asked) => first(await delivery.entry(config.ref, id, options(asked))) as Any | null,
     byIds: async (ids, asked) => all(await delivery.entriesById(config.ref, ids, options(asked))) as Any[],
 
-    type: <T = HydratedEntry, O extends string = string>(slug: string): TypeReader<T, O> => {
+    type: <T = HydratedEntry, O extends string = string>(slug: string): TypeReader<T, O> =>
+    {
       // A slug is unique per ref, not per type, so a typed read checks what it found.
       const ofType = (entry: HydratedEntry | null): T | null => (entry !== null && entry._type === slug ? (entry as T) : null);
       return {
         bySlug: async (entrySlug, asked) => ofType(first(await delivery.entryBySlug(config.ref, entrySlug, options(asked)))),
         byId: async (id, asked) => ofType(first(await delivery.entry(config.ref, id, options(asked)))),
-        list: async (asked = {}) => {
+        list: async (asked = {}) =>
+        {
           const page = await delivery.entries(config.ref, {
             ...options(asked),
             type: slug,

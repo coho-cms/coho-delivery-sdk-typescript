@@ -6,7 +6,8 @@
  */
 
 /** One entry: one locale's values, flattened. */
-export interface Entry {
+export interface Entry
+{
   readonly id: string;
   /** Unique on its ref. */
   readonly slug: string;
@@ -29,7 +30,8 @@ export interface Entry {
 export type UnresolvedReason = 'depth' | 'absent' | (string & {});
 
 /** What every read returns: the roots, everything reached from them, and what was not. */
-export interface EntryGraph {
+export interface EntryGraph
+{
   /** The entries asked for that exist, in the order the read defines. */
   readonly roots: readonly string[];
   /** The roots and every entry reached from them, keyed by id. */
@@ -38,12 +40,14 @@ export interface EntryGraph {
 }
 
 /** A page of a list. */
-export interface EntryList extends EntryGraph {
+export interface EntryList extends EntryGraph
+{
   readonly hasMore: boolean;
 }
 
 /** An RFC 9457 problem document. Branch on `code`, not on the status. */
-export interface Problem {
+export interface Problem
+{
   readonly code: string;
   readonly title: string;
   readonly status: number;
