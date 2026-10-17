@@ -15,6 +15,7 @@ export class CohoDeliveryError extends Error
 {
     readonly status: number;
     readonly code: string;
+
     /** The problem document as the server sent it, when there was one. */
     readonly problem: Problem | undefined;
 

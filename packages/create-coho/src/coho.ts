@@ -12,8 +12,9 @@ export interface TokenDescription
 }
 
 /**
- * Asks Coho at [url] which account and project [token] is for. A token names its own
- * project, so nothing else is needed to find them: no account or project ids to copy.
+ * Asks Coho at {@link url} which account and project {@link token} is for. A token
+ * names its own project, so nothing else is needed to find them: no account or project
+ * ids to copy.
  */
 export async function describeToken(url: string, token: string, fetch: typeof globalThis.fetch = globalThis.fetch): Promise<TokenDescription>
 {

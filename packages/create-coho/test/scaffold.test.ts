@@ -13,7 +13,7 @@ test('the template is copied without history, installed or built files, tarballs
 
     copyTemplate(template(), target);
 
-    for (const kept of ['package.json', 'coho.config.json', 'README.md', '.gitignore', '.env.example', 'src/index.ts', 'src/coho/index.ts'])
+    for (const kept of ['package.json', 'coho.config.json', 'README.md', '.gitignore', '.env.example', 'src/index.ts'])
     {
         assert.ok(existsSync(join(target, kept)), `${kept} is copied`);
     }

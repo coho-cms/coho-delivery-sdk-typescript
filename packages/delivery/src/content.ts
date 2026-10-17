@@ -8,12 +8,14 @@ import type { EntryGraph } from './types.ts';
 export interface ContentOptions
 {
     /**
-   * The ref to read: an environment such as `prod`, or a tag. With a project token,
-   * a branch, or an environment pointing at one such as `dev`.
-   */
+     * The ref to read: an environment such as `prod`, or a tag. With a project token,
+     * a branch, or an environment pointing at one such as `dev`.
+     */
     readonly ref: string;
+
     /** The locale to project to, unless a read names its own. */
     readonly locale?: string;
+
     /** Called once per issue, for the life of the client. Defaults to `console.warn`. */
     readonly onIssue?: (issue: Issue) => void;
 }
@@ -31,6 +33,7 @@ export interface TypeListOptions<O extends string> extends ReadOptions
 {
     /** A sortable field of the type, prefixed `-` for descending. */
     readonly order?: O | `-${O}`;
+
     readonly limit?: number;
     readonly offset?: number;
 }
@@ -40,8 +43,10 @@ export interface TypeReader<T = HydratedEntry, O extends string = string>
 {
     /** The entry with this slug, or null if there is none or it is of another type. */
     bySlug(slug: string, options?: ReadOptions): Promise<T | null>;
+
     /** The entry with this id, or null if there is none or it is of another type. */
     byId(id: string, options?: ReadOptions): Promise<T | null>;
+
     list(options?: TypeListOptions<O>): Promise<Page<T>>;
 }
 
@@ -53,16 +58,20 @@ export interface ContentClient<Any = HydratedEntry>
 {
     /** The untyped client underneath, for anything the hydrated reads do not cover. */
     readonly delivery: DeliveryClient;
+
     /** The entry with this slug, whatever its type, or null. */
     bySlug(slug: string, options?: ReadOptions): Promise<Any | null>;
+
     /** The entry with this id, whatever its type, or null. */
     byId(id: string, options?: ReadOptions): Promise<Any | null>;
+
     /** The entries that exist, sorted by id. Ids not on the ref are left out. */
     byIds(ids: readonly string[], options?: ReadOptions): Promise<Any[]>;
+
     /**
-   * Reads of one content type. Generated code names `T` and the sortable fields `O`;
-   * without them, entries are untyped and any field may be ordered by.
-   */
+     * Reads of one content type. Generated code names `T` and the sortable fields `O`;
+     * without them, entries are untyped and any field may be ordered by.
+     */
     type<T = HydratedEntry, O extends string = string>(slug: string): TypeReader<T, O>;
 }
 

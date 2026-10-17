@@ -2,70 +2,60 @@
 // Project 01920000-0000-7000-8000-00000000c0b1, ref v0.0.1 (a tag), schema sha256:c5c4056cfa2ea143f2c05d09b88b76f74cd6b56d4bed0a57b8d5bf2d9b77f908, type model 1.0.
 
 import * as runtime from "@coho-cms/delivery";
+import type { Article } from "./Article.ts";
+import type { Notice } from "./Notice.ts";
 
 export { isResolved } from "@coho-cms/delivery";
 export type { Linked, Unresolved } from "@coho-cms/delivery";
-
-/** Article */
-export interface Article extends runtime.EntryBase<"article"> {
-  /** title. Absent where the locale has no translation. */
-  readonly title?: string;
-  /** body */
-  readonly body?: string;
-  /** rank */
-  readonly rank?: number;
-  /** related */
-  readonly related?: readonly runtime.Linked<Article>[];
-}
-
-/** Notice */
-export interface Notice extends runtime.EntryBase<"notice"> {
-  /** priority */
-  readonly priority?: number;
-  /** message */
-  readonly message?: string;
-}
+export type { Article } from "./Article.ts";
+export type { Notice } from "./Notice.ts";
 
 /** Any content type on this ref. Switch on `_type` to narrow it. */
 export type AnyEntry = Article | Notice;
 
 /** What the runtime needs to hydrate each type: its links, and the fields it always has. */
 export const shape: runtime.Shape = {
-  article: { links: { related: "many" } },
-  notice: {},
+    article: { links: { related: "many" } },
+    notice: {},
 };
 
 /** Where these types came from, for reporting which release a build was made from. */
 export const source = {
-  project: "01920000-0000-7000-8000-00000000c0b1",
-  ref: "v0.0.1",
-  immutable: true,
-  schemaHash: "sha256:c5c4056cfa2ea143f2c05d09b88b76f74cd6b56d4bed0a57b8d5bf2d9b77f908",
-  irVersion: "1.0",
+    project: "01920000-0000-7000-8000-00000000c0b1",
+    ref: "v0.0.1",
+    immutable: true,
+    schemaHash: "sha256:c5c4056cfa2ea143f2c05d09b88b76f74cd6b56d4bed0a57b8d5bf2d9b77f908",
+    irVersion: "1.0",
 } as const;
 
 /** Typed reads of every content type, on the ref and in the locale the config names. */
-export interface Coho {
-  /** Article */
-  readonly article: runtime.TypeReader<Article, "rank">;
-  /** Notice */
-  readonly notice: runtime.TypeReader<Notice, "priority">;
-  /** The entry with this slug, whatever its type, or null. */
-  bySlug(slug: string, options?: runtime.ReadOptions): Promise<AnyEntry | null>;
-  /** The entry with this id, whatever its type, or null. */
-  byId(id: string, options?: runtime.ReadOptions): Promise<AnyEntry | null>;
-  /** The entries that exist, sorted by id. Ids not on the ref are left out. */
-  byIds(ids: readonly string[], options?: runtime.ReadOptions): Promise<AnyEntry[]>;
+export interface Coho
+{
+    /** Article */
+    readonly article: runtime.TypeReader<Article, "rank">;
+
+    /** Notice */
+    readonly notice: runtime.TypeReader<Notice, "priority">;
+
+    /** The entry with this slug, whatever its type, or null. */
+    bySlug(slug: string, options?: runtime.ReadOptions): Promise<AnyEntry | null>;
+
+    /** The entry with this id, whatever its type, or null. */
+    byId(id: string, options?: runtime.ReadOptions): Promise<AnyEntry | null>;
+
+    /** The entries that exist, sorted by id. Ids not on the ref are left out. */
+    byIds(ids: readonly string[], options?: runtime.ReadOptions): Promise<AnyEntry[]>;
 }
 
 /** A client for these types. The delivery key comes from the app; this library reads no environment. */
-export function createCoho(config: runtime.ContentConfig): Coho {
-  const content = runtime.createContentClient<AnyEntry>(config, shape);
-  return {
-    article: content.type<Article, "rank">("article"),
-    notice: content.type<Notice, "priority">("notice"),
-    bySlug: content.bySlug,
-    byId: content.byId,
-    byIds: content.byIds,
-  };
+export function createCoho(config: runtime.ContentConfig): Coho
+{
+    const content = runtime.createContentClient<AnyEntry>(config, shape);
+    return {
+        article: content.type<Article, "rank">("article"),
+        notice: content.type<Notice, "priority">("notice"),
+        bySlug: content.bySlug,
+        byId: content.byId,
+        byIds: content.byIds,
+    };
 }

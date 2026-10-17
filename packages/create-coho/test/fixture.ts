@@ -38,7 +38,6 @@ export function template(options: { npmrc?: boolean } = {}): string
         '.gitignore': 'node_modules/\ndist/\n.env\n',
         '.env.example': 'COHO_TOKEN=\n',
         'src/index.ts': "export * from './coho/index.ts';\n",
-        'src/coho/index.ts': '// generated\n',
         '.env': 'COHO_TOKEN=coho_pt_secret\n',
         '.git/HEAD': 'ref: refs/heads/v2026.1.0\n',
         'node_modules/typescript/package.json': '{}',

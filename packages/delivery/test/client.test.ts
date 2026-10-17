@@ -113,7 +113,7 @@ test('a preview needs its account and a project token, and takes no key', () =>
     // Never called: `npm run typecheck` fails if the types stop refusing these.
     const refusedByTheTypes = () =>
     {
-    // @ts-expect-error A token needs its account.
+        // @ts-expect-error A token needs its account.
         createDeliveryClient({ url: 'https://coho.test', project: 'p1', token: TOKEN });
         // @ts-expect-error A key or a token, never both.
         createDeliveryClient({ url: 'https://coho.test', account: 'acme', project: 'p1', token: TOKEN, key: 'k' });
@@ -289,7 +289,7 @@ test('a cached body cannot be changed by the caller it was given to', async () =
     const read = await client.entryBySlug('v0.0.1', 'chain-1', { locale: 'en-US' });
     assert.throws(() =>
     {
-    // Past the readonly types on purpose: the freeze is what stops it at runtime.
+        // Past the readonly types on purpose: the freeze is what stops it at runtime.
         (read as unknown as { roots: string[] }).roots.push('x');
     }, TypeError);
 });

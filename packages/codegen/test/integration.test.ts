@@ -9,7 +9,7 @@ import { createCoho, isResolved, source } from './expected/delivery-fixture/inde
  * recordings through the runtime, as a customer's library reads the server.
  */
 
-/** A client over the recordings, in [locale], or in none for `null`. */
+/** A client over the recordings, in {@link locale}, or in none for `null`. */
 function coho(locale: string | null = 'en-US')
 {
     const { fetch } = replay();

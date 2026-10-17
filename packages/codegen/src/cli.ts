@@ -63,7 +63,8 @@ async function main(argv: string[]): Promise<number>
             const generated = generate(readTypeModelFile(loaded.typeModel));
             write(generated.files, loaded.outDir);
             for (const warning of generated.warnings) console.error(`warning: ${warning}`);
-            console.log(`Wrote ${generated.files.map((file) => file.path).join(', ')} to ${shown(loaded.outDir)}.`);
+            const count = generated.files.length;
+            console.log(`Wrote ${count} ${count === 1 ? 'file' : 'files'} to ${shown(loaded.outDir)}.`);
             return 0;
         }
         case 'check': {
@@ -90,7 +91,7 @@ main(process.argv.slice(2)).then(
     },
     (error: unknown) =>
     {
-    // A CodegenError is something to fix; anything else is a bug, and its stack helps.
+        // A CodegenError is something to fix; anything else is a bug, and its stack helps.
         console.error(`error: ${error instanceof CodegenError ? error.message : error instanceof Error ? (error.stack ?? error.message) : String(error)}`);
         process.exitCode = 1;
     },

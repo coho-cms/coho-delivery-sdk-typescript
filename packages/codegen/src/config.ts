@@ -10,13 +10,18 @@ export interface CodegenConfig
 {
     /** The Coho API's origin, such as `https://app.coho.example`. Only `pull` needs it. */
     readonly url?: string;
+
     /** The account id. */
     readonly account?: string;
+
     readonly project?: string;
+
     /** The tag or branch to generate from. Release builds should name a tag. */
     readonly ref?: string;
+
     /** The type model file. Default `coho-ir.json`. */
     readonly typeModel?: string;
+
     /** Where generated code goes. Default `src/coho`. Nothing else should be kept there. */
     readonly outDir?: string;
 }
@@ -24,8 +29,10 @@ export interface CodegenConfig
 export interface Loaded
 {
     readonly config: CodegenConfig;
+
     /** The type model file, resolved. */
     readonly typeModel: string;
+
     /** The output directory, resolved. */
     readonly outDir: string;
 }

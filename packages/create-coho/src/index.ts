@@ -158,7 +158,7 @@ async function main(argv: string[]): Promise<number>
     return 0;
 }
 
-/** Runs npm install in [dir], and says whether it worked. */
+/** Runs npm install in {@link dir}, and says whether it worked. */
 function install(dir: string): boolean
 {
     console.log('\nInstalling…');
@@ -187,7 +187,7 @@ main(process.argv.slice(2)).then(
     },
     (error: unknown) =>
     {
-    // A CreateError is something to fix; anything else is a bug, and its stack helps.
+        // A CreateError is something to fix; anything else is a bug, and its stack helps.
         console.error(`error: ${error instanceof CreateError ? error.message : error instanceof Error ? (error.stack ?? error.message) : String(error)}`);
         process.exitCode = 1;
     },

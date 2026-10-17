@@ -2,102 +2,67 @@
 // Project 01920000-0000-7000-8000-00000000c0b0, ref v1.0.0 (a tag), schema sha256:dd33e07ff418b37690bdfc9b6b959f9dc08e64f63e043ef160e9d0b5887d6f67, type model 1.0.
 
 import * as runtime from "@coho-cms/delivery";
+import type { BlogPost } from "./BlogPost.ts";
+import type { Tag } from "./Tag.ts";
+import type { TeamMember } from "./TeamMember.ts";
 
 export { isResolved } from "@coho-cms/delivery";
 export type { Linked, Unresolved } from "@coho-cms/delivery";
-
-/** Blog post */
-export interface BlogPost extends runtime.EntryBase<"blogPost"> {
-  /** Title. Absent where the locale has no translation. */
-  readonly title?: string;
-  /** Summary. Absent where the locale has no translation. */
-  readonly summary?: string;
-  /** Body. Markdown. Absent where the locale has no translation. */
-  readonly body?: string;
-  /** Layout */
-  readonly layout: "landing" | "standard" | "wide" | (string & {});
-  /** Published at. An ISO 8601 date and time. */
-  readonly publishedAt: string;
-  /** Author */
-  readonly author?: runtime.Linked<TeamMember>;
-  /** Tags */
-  readonly tags?: readonly runtime.Linked<Tag>[];
-  /** Related posts */
-  readonly related?: readonly runtime.Linked<BlogPost>[];
-  /** Reading time (minutes) */
-  readonly readingMinutes?: number;
-  /** Featured */
-  readonly featured?: boolean;
-  /** SEO description. Absent where the locale has no translation. */
-  readonly seoDescription?: string;
-}
-
-/** Tag */
-export interface Tag extends runtime.EntryBase<"tag"> {
-  /** Name */
-  readonly name: string;
-  /** Description */
-  readonly description?: string;
-}
-
-/** Team member */
-export interface TeamMember extends runtime.EntryBase<"teamMember"> {
-  /** Full name */
-  readonly fullName: string;
-  /** Title. Absent where the locale has no translation. */
-  readonly title?: string;
-  /** Disciplines */
-  readonly disciplines: readonly ("drainage" | "geotechnical" | "highways" | "structures" | "traffic" | (string & {}))[];
-  /** Bio. Markdown. Absent where the locale has no translation. */
-  readonly bio?: string;
-  /** Years of experience */
-  readonly yearsExperience?: number;
-}
+export type { BlogPost } from "./BlogPost.ts";
+export type { Tag } from "./Tag.ts";
+export type { TeamMember } from "./TeamMember.ts";
 
 /** Any content type on this ref. Switch on `_type` to narrow it. */
 export type AnyEntry = BlogPost | Tag | TeamMember;
 
 /** What the runtime needs to hydrate each type: its links, and the fields it always has. */
 export const shape: runtime.Shape = {
-  blogPost: { links: { author: "one", tags: "many", related: "many" }, always: ["layout", "publishedAt"] },
-  tag: { always: ["name"] },
-  teamMember: { always: ["fullName", "disciplines"] },
+    blogPost: { links: { author: "one", tags: "many", related: "many" }, always: ["layout", "publishedAt"] },
+    tag: { always: ["name"] },
+    teamMember: { always: ["fullName", "disciplines"] },
 };
 
 /** Where these types came from, for reporting which release a build was made from. */
 export const source = {
-  project: "01920000-0000-7000-8000-00000000c0b0",
-  ref: "v1.0.0",
-  immutable: true,
-  schemaHash: "sha256:dd33e07ff418b37690bdfc9b6b959f9dc08e64f63e043ef160e9d0b5887d6f67",
-  irVersion: "1.0",
+    project: "01920000-0000-7000-8000-00000000c0b0",
+    ref: "v1.0.0",
+    immutable: true,
+    schemaHash: "sha256:dd33e07ff418b37690bdfc9b6b959f9dc08e64f63e043ef160e9d0b5887d6f67",
+    irVersion: "1.0",
 } as const;
 
 /** Typed reads of every content type, on the ref and in the locale the config names. */
-export interface Coho {
-  /** Blog post */
-  readonly blogPost: runtime.TypeReader<BlogPost, "publishedAt" | "readingMinutes">;
-  /** Tag */
-  readonly tag: runtime.TypeReader<Tag, never>;
-  /** Team member */
-  readonly teamMember: runtime.TypeReader<TeamMember, "yearsExperience">;
-  /** The entry with this slug, whatever its type, or null. */
-  bySlug(slug: string, options?: runtime.ReadOptions): Promise<AnyEntry | null>;
-  /** The entry with this id, whatever its type, or null. */
-  byId(id: string, options?: runtime.ReadOptions): Promise<AnyEntry | null>;
-  /** The entries that exist, sorted by id. Ids not on the ref are left out. */
-  byIds(ids: readonly string[], options?: runtime.ReadOptions): Promise<AnyEntry[]>;
+export interface Coho
+{
+    /** Blog post */
+    readonly blogPost: runtime.TypeReader<BlogPost, "publishedAt" | "readingMinutes">;
+
+    /** Tag */
+    readonly tag: runtime.TypeReader<Tag, never>;
+
+    /** Team member */
+    readonly teamMember: runtime.TypeReader<TeamMember, "yearsExperience">;
+
+    /** The entry with this slug, whatever its type, or null. */
+    bySlug(slug: string, options?: runtime.ReadOptions): Promise<AnyEntry | null>;
+
+    /** The entry with this id, whatever its type, or null. */
+    byId(id: string, options?: runtime.ReadOptions): Promise<AnyEntry | null>;
+
+    /** The entries that exist, sorted by id. Ids not on the ref are left out. */
+    byIds(ids: readonly string[], options?: runtime.ReadOptions): Promise<AnyEntry[]>;
 }
 
 /** A client for these types. The delivery key comes from the app; this library reads no environment. */
-export function createCoho(config: runtime.ContentConfig): Coho {
-  const content = runtime.createContentClient<AnyEntry>(config, shape);
-  return {
-    blogPost: content.type<BlogPost, "publishedAt" | "readingMinutes">("blogPost"),
-    tag: content.type<Tag, never>("tag"),
-    teamMember: content.type<TeamMember, "yearsExperience">("teamMember"),
-    bySlug: content.bySlug,
-    byId: content.byId,
-    byIds: content.byIds,
-  };
+export function createCoho(config: runtime.ContentConfig): Coho
+{
+    const content = runtime.createContentClient<AnyEntry>(config, shape);
+    return {
+        blogPost: content.type<BlogPost, "publishedAt" | "readingMinutes">("blogPost"),
+        tag: content.type<Tag, never>("tag"),
+        teamMember: content.type<TeamMember, "yearsExperience">("teamMember"),
+        bySlug: content.bySlug,
+        byId: content.byId,
+        byIds: content.byIds,
+    };
 }

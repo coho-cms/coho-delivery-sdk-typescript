@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { CodegenError, generate, readTypeModel } from '../src/index.ts';
-import type { Field, TypeModel } from '../src/index.ts';
+import { fileURLToPath } from 'node:url';
+import { CodegenError, drift, generate, readTypeModel, write } from '../src/index.ts';
+import type { Field, Generated, TypeModel } from '../src/index.ts';
 
 /**
- * Each fixture's generated module is compared byte for byte with the one checked in
- * under `expected/`, which `npm run typecheck` also compiles against the runtime.
- * After an intended change, rewrite them with `COHO_UPDATE_GOLDEN=1 npm test` and
- * review the diff.
+ * Each fixture's generated files are compared byte for byte with the ones checked in
+ * under `expected/`, which `npm run typecheck` also compiles against the runtime and
+ * `npm run lint` holds to this repository's style. After an intended change, rewrite
+ * them with `COHO_UPDATE_GOLDEN=1 npm test` and review the diff.
  */
 const FIXTURES = ['cli-next-blog', 'delivery-fixture'];
 
@@ -19,23 +20,54 @@ function fixture(name: string): TypeModel
 
 for (const name of FIXTURES)
 {
-    test(`${name} generates its expected module, byte for byte`, () =>
+    test(`${name} generates its expected files, byte for byte`, () =>
     {
         const generated = generate(fixture(name));
-        const expected = new URL(`./expected/${name}/index.ts`, import.meta.url);
-        const contents = generated.files[0]?.contents ?? '';
+        const expected = fileURLToPath(new URL(`./expected/${name}`, import.meta.url));
 
         if (process.env['COHO_UPDATE_GOLDEN'] === '1')
         {
-            mkdirSync(new URL('.', expected), { recursive: true });
-            writeFileSync(expected, contents);
+            write(generated.files, expected);
             return;
         }
-        assert.deepEqual(generated.files.map((file) => file.path), ['index.ts']);
-        assert.equal(contents, readFileSync(expected, 'utf8'));
+        assert.deepEqual(drift(generated.files, expected), []);
         assert.deepEqual(generated.warnings, []);
     });
 }
+
+test('each type is its own file, importing the types it links to', () =>
+{
+    const generated = generate(model({
+        post: [{ id: 'author', kind: 'reference', many: false, of: ['person'] }, { id: 'related', kind: 'reference', many: true, of: ['post'] }],
+        person: [{ id: 'name' }],
+    }));
+
+    assert.deepEqual(generated.files.map((file) => file.path), ['index.ts', 'Person.ts', 'Post.ts']);
+    const post = file(generated, 'Post.ts');
+    assert.match(post, /^import type \{ Person \} from "\.\/Person\.ts";$/m);
+    // Not itself, though it links to itself.
+    assert.doesNotMatch(post, /from "\.\/Post\.ts"/);
+    assert.match(post, /^export interface Post extends runtime\.EntryBase<"post">\n\{\n {4}\/\*\* author \*\/$/m);
+    assert.match(file(generated, 'index.ts'), /^export type \{ Post \} from "\.\/Post\.ts";$/m);
+});
+
+test('a type model with no types is index.ts alone, with only the untyped reads', () =>
+{
+    const generated = generate(model({}));
+
+    assert.deepEqual(generated.files.map((each) => each.path), ['index.ts']);
+    const index = file(generated, 'index.ts');
+    assert.match(index, /^export type AnyEntry = never;$/m);
+    assert.match(index, /^export const shape: runtime\.Shape = \{\};$/m);
+});
+
+test('types whose files would be one file on a case-insensitive file system are refused', () =>
+{
+    assert.throws(
+        () => generate(model({ blogPost: [], blogpost: [] })),
+        (error: unknown) => error instanceof CodegenError && /Blogpost\.ts and BlogPost\.ts|BlogPost\.ts and Blogpost\.ts/.test(error.message),
+    );
+});
 
 /** A type model with the given types, each field filled out with the defaults a plain optional field has. */
 function model(types: Record<string, readonly Partial<Field>[]>, overrides: Partial<TypeModel> = {}): TypeModel
@@ -58,7 +90,16 @@ function model(types: Record<string, readonly Partial<Field>[]>, overrides: Part
     });
 }
 
-const code = (generated: TypeModel): string => generate(generated).files[0]?.contents ?? '';
+/** One generated file's contents, by its path. */
+function file(generated: Generated, path: string): string
+{
+    const found = generated.files.find((each) => each.path === path);
+    assert.ok(found !== undefined, `${path} was not generated`);
+    return found.contents;
+}
+
+/** Every file generated for {@link types}, one after another. */
+const code = (types: TypeModel): string => generate(types).files.map((each) => each.contents).join('\n');
 
 test('the order of types in the model does not change the output', () =>
 {
@@ -68,20 +109,21 @@ test('the order of types in the model does not change the output', () =>
     assert.equal(code(a), code(b));
 });
 
-test('a type named like one of the module\'s own names is given Entry after it, with a warning', () =>
+test('a type named like one of the generated code\'s own names is given Entry after it, with a warning', () =>
 {
-    const generated = generate(model({ coho: [], linked: [] }));
-    const contents = generated.files[0]?.contents ?? '';
+    const generated = generate(model({ coho: [], linked: [], index: [] }));
 
-    assert.match(contents, /export interface CohoEntry extends runtime\.EntryBase<"coho">/);
-    assert.match(contents, /export interface LinkedEntry extends runtime\.EntryBase<"linked">/);
-    assert.equal(generated.warnings.length, 2);
+    assert.match(file(generated, 'CohoEntry.ts'), /export interface CohoEntry extends runtime\.EntryBase<"coho">/);
+    assert.match(file(generated, 'LinkedEntry.ts'), /export interface LinkedEntry extends runtime\.EntryBase<"linked">/);
+    // Index.ts would be index.ts on a case-insensitive file system.
+    assert.match(file(generated, 'IndexEntry.ts'), /export interface IndexEntry extends runtime\.EntryBase<"index">/);
+    assert.equal(generated.warnings.length, 3);
 });
 
 test('a type slugged like an untyped read is read as <slug>Type, with a warning', () =>
 {
     const generated = generate(model({ byId: [] }));
-    const contents = generated.files[0]?.contents ?? '';
+    const contents = file(generated, 'index.ts');
 
     assert.match(contents, /readonly byIdType: runtime\.TypeReader<ById, never>;/);
     assert.match(contents, /byIdType: content\.type<ById, never>\("byId"\),/);
@@ -92,7 +134,7 @@ test('a field kind this generator does not know is typed unknown, with a warning
 {
     const generated = generate(model({ post: [{ id: 'shape', kind: 'polygon' }] }));
 
-    assert.match(generated.files[0]?.contents ?? '', /readonly shape\?: unknown;/);
+    assert.match(file(generated, 'Post.ts'), /readonly shape\?: unknown;/);
     assert.match(generated.warnings[0] ?? '', /'polygon'/);
 });
 
@@ -105,10 +147,11 @@ test('a link whose target type is not on the ref is an untyped entry', () =>
 
 test('repeater items are typed by their id until component types are', () =>
 {
-    const contents = code(model({ page: [{ id: 'blocks', kind: 'repeater', of: ['hero'] }] }));
+    const generated = generate(model({ page: [{ id: 'blocks', kind: 'repeater', of: ['hero'] }] }));
 
-    assert.match(contents, /export type RepeaterItem = /);
-    assert.match(contents, /readonly blocks\?: readonly RepeaterItem\[\];/);
+    assert.match(file(generated, 'RepeaterItem.ts'), /export type RepeaterItem = /);
+    assert.match(file(generated, 'Page.ts'), /^import type \{ RepeaterItem \} from "\.\/RepeaterItem\.ts";$/m);
+    assert.match(file(generated, 'Page.ts'), /readonly blocks\?: readonly RepeaterItem\[\];/);
 });
 
 test('choice values are escaped, and a display name cannot end its doc comment', () =>
@@ -132,7 +175,7 @@ test('a model from a branch, and the model\'s own warnings, are reported', () =>
         "post.author: links to type 'ghost', which is not on this ref",
         "Generated from 'feature/x', a branch: its types can change. Release builds should name a tag.",
     ]);
-    assert.match(generated.files[0]?.contents ?? '', /ref feature\/x \(a branch, whose types can change\)/);
+    assert.match(file(generated, 'index.ts'), /ref feature\/x \(a branch, whose types can change\)/);
 });
 
 test('a type model of another major version is refused', () =>

@@ -9,8 +9,10 @@ export interface Recording
 {
     readonly request: {
         readonly method: string;
+
         /** Relative to the project's base URL. */
         readonly path: string;
+
         readonly auth: 'key' | 'none' | 'other-key';
     };
     readonly response: {
@@ -18,6 +20,7 @@ export interface Recording
         readonly headers: {
             readonly 'content-type'?: string;
             readonly 'cache-control'?: string;
+
             /** Whether one was sent. Its value is not recorded. */
             readonly etag: boolean;
         };

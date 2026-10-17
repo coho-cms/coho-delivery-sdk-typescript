@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
-import { appendFileSync, copyFileSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, copyFileSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -11,9 +11,9 @@ import { fileURLToPath } from 'node:url';
 
 const CLI = fileURLToPath(new URL('../src/cli.ts', import.meta.url));
 const MODEL = fileURLToPath(new URL('../../../spec/type-model/fixtures/cli-next-blog.json', import.meta.url));
-const EXPECTED = fileURLToPath(new URL('./expected/cli-next-blog/index.ts', import.meta.url));
+const EXPECTED = fileURLToPath(new URL('./expected/cli-next-blog', import.meta.url));
 
-/** Runs the CLI in [dir], without COHO_TOKEN unless [env] gives one. */
+/** Runs the CLI in {@link dir}, without COHO_TOKEN unless {@link env} gives one. */
 function run(dir: string, args: string[], env: Record<string, string> = {})
 {
     const inherited = { ...process.env };
@@ -30,13 +30,15 @@ function library(): string
     return dir;
 }
 
-test('generate writes the module, and check passes until it is edited', () =>
+test('generate writes the files, and check passes until one is edited', () =>
 {
     const dir = library();
+    const out = join(dir, 'src', 'coho');
 
     const generated = run(dir, ['generate']);
     assert.equal(generated.status, 0, generated.stderr);
-    assert.equal(readFileSync(join(dir, 'src', 'coho', 'index.ts'), 'utf8'), readFileSync(EXPECTED, 'utf8'));
+    assert.deepEqual(readdirSync(out).sort(), readdirSync(EXPECTED).sort());
+    for (const name of readdirSync(EXPECTED)) assert.equal(readFileSync(join(out, name), 'utf8'), readFileSync(join(EXPECTED, name), 'utf8'));
     assert.equal(run(dir, ['check']).status, 0);
 
     appendFileSync(join(dir, 'src', 'coho', 'index.ts'), '// edited\n');

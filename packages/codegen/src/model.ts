@@ -10,18 +10,23 @@ export interface TypeModel
 {
     readonly irVersion: string;
     readonly source: Source;
+
     /** Content types by slug. */
     readonly types: Readonly<Record<string, ContentType>>;
+
     readonly warnings?: readonly ModelWarning[];
 }
 
 export interface Source
 {
     readonly project: string;
+
     /** The branch or tag the types came from. */
     readonly ref: string;
+
     /** True for a tag, whose types can never change. */
     readonly immutable: boolean;
+
     readonly schemaHash: string;
 }
 
@@ -37,16 +42,21 @@ export interface Field
 {
     readonly id: string;
     readonly name: string;
+
     /** Open: a kind added after this generator was written is emitted untyped. */
     readonly kind: string;
+
     /** Whether delivery always includes the field. The one rule for optionality. */
     readonly presence: 'always' | 'maybe';
+
     readonly required: boolean;
     readonly localized: boolean;
     readonly sortable: boolean;
     readonly many?: boolean;
+
     /** Reference targets, each a key of `types`; or a repeater's component types. */
     readonly of?: readonly string[];
+
     readonly values?: readonly string[];
     readonly textFormat?: string;
     readonly min?: number;

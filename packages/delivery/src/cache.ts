@@ -11,6 +11,7 @@ export interface Cached
 {
     readonly body: unknown;
     readonly etag: string | undefined;
+
     /** Until when, in milliseconds since the epoch, the body may be used without asking. */
     readonly freshUntil: number;
 }

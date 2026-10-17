@@ -13,11 +13,11 @@ npm install --save-peer @coho-cms/delivery
 
 ```bash
 coho-codegen pull       # fetch the type model for the configured ref into coho-ir.json
-coho-codegen generate   # write src/coho/index.ts from coho-ir.json
+coho-codegen generate   # write src/coho/ from coho-ir.json: a file per type, and index.ts
 coho-codegen check      # fail if src/coho differs from what generate would write
 ```
 
-Commit `coho-ir.json` and `src/coho/`. A schema change then shows up as a diff in review, and `check` in CI catches generated code that is out of date. `generate` and `check` never call the server.
+Commit `coho-ir.json` and `src/coho/`. `generate` removes the files of types no longer on the ref, and leaves anything it did not write. A schema change then shows up as a diff in review, and `check` in CI catches generated code that is out of date. `generate` and `check` never call the server.
 
 `pull` needs `COHO_TOKEN`: a project token with read access. It is read from the environment, or for local runs from a `.env` file beside the config, and never from the config itself. Keep it in CI secrets and out of every app that installs the library. `pull --ref v1.4.0` pulls another tag than the config names. An unchanged type model costs a `304`.
 
@@ -55,14 +55,14 @@ const post = await coho.blogPost.bySlug('hello-world', { depth: 2 });
 const latest = await coho.blogPost.list({ order: '-publishedAt', limit: 3 });
 ```
 
-- **One interface per content type**, named from its slug: `blogPost` becomes `BlogPost`. Its fields sit beside the system keys `_id`, `_type`, `_slug` and `_locale`.
+- **One interface per content type, in its own file**, named from its slug: `blogPost` becomes `BlogPost`, in `BlogPost.ts`. `index.ts` exports them all, with `createCoho`. Its fields sit beside the system keys `_id`, `_type`, `_slug` and `_locale`.
 - **A field is optional when delivery can leave it out**, which includes every localized field. A choice accepts values added after generation, so new content never breaks the build.
 - **References are typed by their targets**: `Linked<TeamMember>`, which is the entry, or a stub saying why it is not there.
 - **`order` accepts only fields the type can be sorted by**, so an unsortable order is a compile error rather than a refused request.
 - **`AnyEntry`** is the union of every type; switch on `_type` to narrow it. `source` names the tag the code was generated from.
 - **The library reads no environment.** The app passes the delivery key to `createCoho`.
 
-If a type's name would collide with one the module defines (`Coho`, `AnyEntry`, `Linked`, `Unresolved`, `RepeaterItem`), its interface gets `Entry` after it. A type slugged `bySlug`, `byId` or `byIds` is read as `coho.<slug>Type`. `generate` says when either happens.
+If a type's name would collide with one the generated code defines (`Coho`, `AnyEntry`, `Linked`, `Unresolved`, `RepeaterItem`), or with `index.ts` (`Index`), its interface gets `Entry` after it. Two types whose files differ only in case, such as `BlogPost.ts` and `Blogpost.ts`, are refused: they would be one file on macOS and Windows. A type slugged `bySlug`, `byId` or `byIds` is read as `coho.<slug>Type`. `generate` says when either happens.
 
 ## License
 

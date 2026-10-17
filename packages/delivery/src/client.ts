@@ -7,6 +7,7 @@ export interface ClientOptions
 {
     /** The fetch to use. Defaults to the global one. */
     readonly fetch?: typeof globalThis.fetch;
+
     /** The private response cache: on by default, holding up to 1000 responses. `false` turns it off. */
     readonly cache?: false | { readonly maxEntries?: number };
 }
@@ -19,13 +20,16 @@ export interface ReleasedConfig extends ClientOptions
 {
     /** Where delivery is served, such as `https://delivery.coho.example`. */
     readonly url: string;
+
     /** The project id. It selects the project; the key is what authorizes. */
     readonly project: string;
+
     /**
-   * A delivery key, sent as `Authorization: Bearer` and never in a URL. Leave it out
-   * only for an environment the project has opened to keyless reads.
-   */
+     * A delivery key, sent as `Authorization: Bearer` and never in a URL. Leave it out
+     * only for an environment the project has opened to keyless reads.
+     */
     readonly key?: string;
+
     readonly account?: never;
     readonly token?: never;
     readonly baseUrl?: never;
@@ -40,15 +44,19 @@ export interface PreviewConfig extends ClientOptions
 {
     /** Coho's own URL, where you sign in, such as `https://api.coho.example`. Not delivery's. */
     readonly url: string;
+
     /** The account the project belongs to. */
     readonly account: string;
+
     readonly project: string;
+
     /**
-   * A project token, `coho_pt_…`, with read access to the project: the viewer role is
-   * enough. ⚠️ It reads everything unreleased, so keep it on the server, out of any
-   * bundle a browser loads.
-   */
+     * A project token, `coho_pt_…`, with read access to the project: the viewer role is
+     * enough. ⚠️ It reads everything unreleased, so keep it on the server, out of any
+     * bundle a browser loads.
+     */
     readonly token: string;
+
     readonly key?: never;
     readonly baseUrl?: never;
 }
@@ -57,8 +65,10 @@ export interface PreviewConfig extends ClientOptions
 export interface MountedConfig extends ClientOptions
 {
     readonly baseUrl: string;
+
     /** A delivery key, sent as `Authorization: Bearer` and never in a URL. */
     readonly key?: string;
+
     readonly url?: never;
     readonly project?: never;
     readonly account?: never;
@@ -71,6 +81,7 @@ export interface ReadOptions
 {
     /** How many reference hops to follow from each root, 0 to 5. The server's default is 0. */
     readonly depth?: number;
+
     /** The locale to project to. Without one, localized fields are absent. */
     readonly locale?: string;
 }
@@ -78,8 +89,10 @@ export interface ReadOptions
 export interface ListOptions extends ReadOptions
 {
     readonly type?: string;
+
     /** A sortable field of `type`, prefixed `-` for descending. Needs `type`. */
     readonly order?: string;
+
     readonly limit?: number;
     readonly offset?: number;
 }
@@ -89,10 +102,13 @@ export interface DeliveryClient
 {
     /** A page of entries on `ref`, in the order `order` asks for, or by id. */
     entries(ref: string, options?: ListOptions): Promise<EntryList>;
+
     /** One entry by id, or null if it is not on `ref`. */
     entry(ref: string, id: string, options?: ReadOptions): Promise<EntryGraph | null>;
+
     /** One entry by slug, or null if it is not on `ref`. */
     entryBySlug(ref: string, slug: string, options?: ReadOptions): Promise<EntryGraph | null>;
+
     /** Several entries by id, at most 100. An id not on `ref` is reported under `unresolved` as `absent`. */
     entriesById(ref: string, ids: readonly string[], options?: ReadOptions): Promise<EntryGraph>;
 }
@@ -295,7 +311,7 @@ async function problemOf(response: Response): Promise<Problem | undefined>
     }
     catch
     {
-    // Labelled JSON and not JSON: no problem document to report.
+        // Labelled JSON and not JSON: no problem document to report.
     }
     return undefined;
 }

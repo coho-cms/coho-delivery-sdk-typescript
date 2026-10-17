@@ -1,12 +1,13 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { CodegenConfig } from './config.ts';
+import { GENERATED_MARK } from './generate.ts';
 import type { GeneratedFile } from './generate.ts';
 import { CodegenError, readTypeModel } from './model.ts';
 import type { TypeModel } from './model.ts';
 
-/** The type model in [path], read and checked. */
+/** The type model in {@link path}, read and checked. */
 export function readTypeModelFile(path: string): TypeModel
 {
     if (!existsSync(path)) throw new CodegenError(`No type model at ${path}: run coho-codegen pull`);
@@ -17,11 +18,12 @@ export interface PullOptions
 {
     /** A project token with read access. */
     readonly token: string;
+
     readonly fetch?: typeof globalThis.fetch;
 }
 
 /**
- * Fetches the type model for the configured ref and writes it to [path] as it
+ * Fetches the type model for the configured ref and writes it to {@link path} as it
  * arrived, so the committed file is exactly what the server sent.
  *
  * The server's ETag is the SHA-256 of the body, and the file is the body, so the
@@ -38,7 +40,7 @@ export async function pull(config: CodegenConfig, path: string, options: PullOpt
         throw new CodegenError('pull needs url, account, project and ref in the config');
     }
     const endpoint = `${url.replace(/\/+$/, '')}/api/v1/accounts/${encodeURIComponent(account)}/projects/` +
-    `${encodeURIComponent(project)}/refs/${encodeURIComponent(ref)}/type-model`;
+        `${encodeURIComponent(project)}/refs/${encodeURIComponent(ref)}/type-model`;
 
     const existing = existsSync(path) ? readFileSync(path) : undefined;
     const headers: Record<string, string> = { accept: 'application/json', authorization: `Bearer ${options.token}` };
@@ -58,16 +60,26 @@ export async function pull(config: CodegenConfig, path: string, options: PullOpt
     return { changed: true, model };
 }
 
-/** Writes [files] into [outDir]. */
+/**
+ * Writes {@link files} into {@link outDir}, and removes the files an earlier run
+ * generated that this one does not, so a type taken off the ref takes its file with it.
+ * A file without the generated header is never removed.
+ */
 export function write(files: readonly GeneratedFile[], outDir: string): void
 {
     mkdirSync(outDir, { recursive: true });
     for (const file of files) writeFileSync(join(outDir, file.path), file.contents);
+    for (const name of readdirSync(outDir))
+    {
+        const path = join(outDir, name);
+        if (files.some((file) => file.path === name) || !statSync(path).isFile()) continue;
+        if (readFileSync(path, 'utf8').startsWith(GENERATED_MARK)) rmSync(path);
+    }
 }
 
 /**
- * How [outDir] differs from [files]: each file missing or different, and each file
- * there that nothing generates. Empty when the generated code is up to date.
+ * How {@link outDir} differs from {@link files}: each file missing or different, and
+ * each file there that nothing generates. Empty when the generated code is up to date.
  */
 export function drift(files: readonly GeneratedFile[], outDir: string): string[]
 {
@@ -112,7 +124,7 @@ async function failure(response: Response): Promise<string>
     }
     catch
     {
-    // Not a problem document; the status says enough.
+        // Not a problem document; the status says enough.
     }
     const hint = response.status === 401 || response.status === 403 ? ' Check COHO_TOKEN: it needs read access to the project.' : '';
     return `Pulling the type model failed with ${response.status}${detail === '' ? '' : ` (${detail})`}.${hint}`;

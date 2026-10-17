@@ -37,7 +37,7 @@ const PACKED_AS: Readonly<Record<string, string>> = { gitignore: '.gitignore', n
 /** The packages a library is generated against, released together with create-coho. */
 const SDK = ['@coho-cms/delivery', '@coho-cms/codegen'] as const;
 
-/** Copies the template in [from] into [to], leaving behind what must not travel. */
+/** Copies the template in {@link from} into {@link to}, leaving behind what must not travel. */
 export function copyTemplate(from: string, to: string): void
 {
     cpSync(from, to, {
@@ -47,7 +47,7 @@ export function copyTemplate(from: string, to: string): void
 }
 
 /**
- * Bundles the template checkout in [from] into [to], to be published inside
+ * Bundles the template checkout in {@link from} into {@link to}, to be published inside
  * create-coho: the lockfile stays behind, since a new library pins its own versions,
  * and each dotfile npm would drop travels under its packed name.
  */
@@ -71,7 +71,7 @@ export function restoreDotfiles(dir: string): void
     }
 }
 
-/** Sets the library up as [answers] say: its package name, and where its content types come from. */
+/** Sets the library up as {@link answers} say: its package name, and where its content types come from. */
 export function customize(dir: string, answers: Answers): void
 {
     editJson(join(dir, 'package.json'), (pkg) =>
@@ -94,9 +94,9 @@ export function customize(dir: string, answers: Answers): void
 }
 
 /**
- * Writes the library's `.env` from its `.env.example`, with [token] as `COHO_TOKEN`, so
- * `npm run pull` works at once. `.env` is in the template's `.gitignore`, and only its
- * owner can read it.
+ * Writes the library's `.env` from its `.env.example`, with {@link token} as
+ * `COHO_TOKEN`, so `npm run pull` works at once. `.env` is in the template's
+ * `.gitignore`, and only its owner can read it.
  */
 export function writeEnv(dir: string, token: string): void
 {
@@ -107,8 +107,8 @@ export function writeEnv(dir: string, token: string): void
 }
 
 /**
- * Pins the library to the SDK released with this create-coho, [version]: exactly, for
- * the packages it builds with, and from there up for its peer dependency. The
+ * Pins the library to the SDK released with this create-coho, {@link version}: exactly,
+ * for the packages it builds with, and from there up for its peer dependency. The
  * template's lockfile goes, so the first install resolves exactly these.
  */
 export function pinSdk(dir: string, version: string): void
@@ -126,13 +126,13 @@ export function pinSdk(dir: string, version: string): void
     rmSync(join(dir, 'package-lock.json'), { force: true });
 }
 
-/** Whether npm would accept [name], such as `@acme/content`. */
+/** Whether npm would accept {@link name}, such as `@acme/content`. */
 export function isValidPackageName(name: string): boolean
 {
     return name.length <= 214 && /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/.test(name);
 }
 
-/** Whether [dir] can be created into: it does not exist, or holds nothing but a `.git`. */
+/** Whether {@link dir} can be created into: it does not exist, or holds nothing but a `.git`. */
 export function isFree(dir: string): boolean
 {
     return !existsSync(dir) || readdirSync(dir).every((name) => name === '.git');

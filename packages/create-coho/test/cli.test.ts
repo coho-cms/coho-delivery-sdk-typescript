@@ -12,7 +12,7 @@ import { VERSION, temp, template } from './fixture.ts';
 const CLI = fileURLToPath(new URL('../src/index.ts', import.meta.url));
 const BUNDLED = fileURLToPath(new URL('../template', import.meta.url));
 
-/** Runs create-coho in [dir], without a terminal, so nothing is asked. */
+/** Runs create-coho in {@link dir}, without a terminal, so nothing is asked. */
 function run(dir: string, args: string[])
 {
     return spawnSync(process.execPath, [CLI, ...args], { cwd: dir, encoding: 'utf8', env: withoutToken() });
@@ -41,7 +41,7 @@ function withoutToken(): NodeJS.ProcessEnv
 
 const TOKEN = `coho_pt_${'A'.repeat(22)}${'b'.repeat(43)}`;
 
-/** A stand-in for Coho's `GET /api/v1/token`, answering [status] and [body], and noting what it was asked. */
+/** A stand-in for Coho's `GET /api/v1/token`, answering {@link status} and {@link body}, and noting what it was asked. */
 async function coho(status: number, body: unknown)
 {
     const asked: { path: string; authorization: string | undefined }[] = [];

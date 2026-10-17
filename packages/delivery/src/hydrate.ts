@@ -12,6 +12,7 @@ export interface TypeShape
 {
     /** The reference fields, by field id. */
     readonly links?: Readonly<Record<string, LinkKind>>;
+
     /** The fields delivery always includes: required, and not localized. */
     readonly always?: readonly string[];
 }
@@ -28,6 +29,7 @@ export interface EntryBase<T extends string = string>
     readonly _id: string;
     readonly _type: T;
     readonly _slug: string;
+
     /** The locale the entry was projected for. Absent when none was requested. */
     readonly _locale?: string;
 }
@@ -39,10 +41,11 @@ export type HydratedEntry = EntryBase & { readonly [field: string]: unknown };
 export interface Unresolved
 {
     readonly _id: string;
+
     /**
-   * `depth` and `absent` as delivery reports them: beyond the requested depth, or
-   * not on the ref. `cycle` where following the link would close a loop.
-   */
+     * `depth` and `absent` as delivery reports them: beyond the requested depth, or
+     * not on the ref. `cycle` where following the link would close a loop.
+     */
     readonly _unresolved: 'depth' | 'absent' | 'cycle' | (string & {});
 }
 
@@ -58,12 +61,13 @@ export function isResolved<T>(value: Linked<T>): value is T
 export interface Issue
 {
     /**
-   * `missing-field`: a field the type always has is absent, as old entries are after
-   * a field becomes required. `unexpected-value`: one link where the type says many,
-   * or the other way round. `unlisted-link`: a link delivery neither resolved nor
-   * reported, which means the shape and the content disagree about the field.
-   */
+     * `missing-field`: a field the type always has is absent, as old entries are after
+     * a field becomes required. `unexpected-value`: one link where the type says many,
+     * or the other way round. `unlisted-link`: a link delivery neither resolved nor
+     * reported, which means the shape and the content disagree about the field.
+     */
     readonly kind: 'missing-field' | 'unexpected-value' | 'unlisted-link';
+
     readonly id: string;
     readonly slug: string;
     readonly type: string;

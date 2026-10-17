@@ -9,8 +9,10 @@ export interface Template
 {
     /** A folder holding the template's files. */
     readonly dir: string;
+
     /** What it came from, for telling the person running it. */
     readonly from: string;
+
     /** Removes whatever was downloaded. Nothing, for a local folder. */
     readonly cleanup: () => void;
 }
@@ -33,14 +35,15 @@ export function bundledTemplate(): Template
 export interface SourceOptions
 {
     readonly fetch?: typeof globalThis.fetch;
+
     /** Where GitHub archives are downloaded from. */
     readonly archives?: string;
 }
 
 /**
- * [spec] as a template: a local folder, used as it is, or a GitHub repository as
- * `owner/repo#ref`, downloaded and unpacked. A folder wins, so a local checkout can
- * be tried before anything is pushed.
+ * {@link spec} as a template: a local folder, used as it is, or a GitHub repository as
+ * `owner/repo#ref`, downloaded and unpacked. A folder wins, so a local checkout can be
+ * tried before anything is pushed.
  */
 export async function resolveTemplate(spec: string, options: SourceOptions = {}): Promise<Template>
 {
