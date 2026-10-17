@@ -4,21 +4,21 @@ import { basename, join } from 'node:path';
 /** A refusal to go on, with a message for whoever ran it. */
 export class CreateError extends Error
 {
-  constructor(message: string)
-  {
-    super(message);
-    this.name = 'CreateError';
-  }
+    constructor(message: string)
+    {
+        super(message);
+        this.name = 'CreateError';
+    }
 }
 
 /** What the new library is set up with. A value left out keeps the template's placeholder. */
 export interface Answers
 {
-  readonly name: string;
-  readonly url?: string;
-  readonly account?: string;
-  readonly project?: string;
-  readonly ref?: string;
+    readonly name: string;
+    readonly url?: string;
+    readonly account?: string;
+    readonly project?: string;
+    readonly ref?: string;
 }
 
 /**
@@ -40,10 +40,10 @@ const SDK = ['@coho-cms/delivery', '@coho-cms/codegen'] as const;
 /** Copies the template in [from] into [to], leaving behind what must not travel. */
 export function copyTemplate(from: string, to: string): void
 {
-  cpSync(from, to, {
-    recursive: true,
-    filter: (source) => source === from || (!LEFT_BEHIND.has(basename(source)) && !source.endsWith('.tgz')),
-  });
+    cpSync(from, to, {
+        recursive: true,
+        filter: (source) => source === from || (!LEFT_BEHIND.has(basename(source)) && !source.endsWith('.tgz')),
+    });
 }
 
 /**
@@ -53,44 +53,44 @@ export function copyTemplate(from: string, to: string): void
  */
 export function bundleTemplate(from: string, to: string): void
 {
-  rmSync(to, { recursive: true, force: true });
-  copyTemplate(from, to);
-  rmSync(join(to, 'package-lock.json'), { force: true });
-  for (const [packed, dotfile] of Object.entries(PACKED_AS))
-  {
-    if (existsSync(join(to, dotfile))) renameSync(join(to, dotfile), join(to, packed));
-  }
+    rmSync(to, { recursive: true, force: true });
+    copyTemplate(from, to);
+    rmSync(join(to, 'package-lock.json'), { force: true });
+    for (const [packed, dotfile] of Object.entries(PACKED_AS))
+    {
+        if (existsSync(join(to, dotfile))) renameSync(join(to, dotfile), join(to, packed));
+    }
 }
 
 /** Gives a library copied from a bundled template its dotfiles back. */
 export function restoreDotfiles(dir: string): void
 {
-  for (const [packed, dotfile] of Object.entries(PACKED_AS))
-  {
-    if (existsSync(join(dir, packed))) renameSync(join(dir, packed), join(dir, dotfile));
-  }
+    for (const [packed, dotfile] of Object.entries(PACKED_AS))
+    {
+        if (existsSync(join(dir, packed))) renameSync(join(dir, packed), join(dir, dotfile));
+    }
 }
 
 /** Sets the library up as [answers] say: its package name, and where its content types come from. */
 export function customize(dir: string, answers: Answers): void
 {
-  editJson(join(dir, 'package.json'), (pkg) =>
-  {
-    pkg['name'] = answers.name;
-  });
-
-  editJson(join(dir, 'coho.config.json'), (config) =>
-  {
-    for (const key of ['url', 'account', 'project', 'ref'] as const)
+    editJson(join(dir, 'package.json'), (pkg) =>
     {
-      const value = answers[key];
-      if (value !== undefined && value !== '') config[key] = value;
-    }
-  });
+        pkg['name'] = answers.name;
+    });
 
-  // The README's title is the template's own name. The rest still applies to the library.
-  const readme = join(dir, 'README.md');
-  if (existsSync(readme)) writeFileSync(readme, readFileSync(readme, 'utf8').replace(/^# .*$/m, `# ${answers.name}`));
+    editJson(join(dir, 'coho.config.json'), (config) =>
+    {
+        for (const key of ['url', 'account', 'project', 'ref'] as const)
+        {
+            const value = answers[key];
+            if (value !== undefined && value !== '') config[key] = value;
+        }
+    });
+
+    // The README's title is the template's own name. The rest still applies to the library.
+    const readme = join(dir, 'README.md');
+    if (existsSync(readme)) writeFileSync(readme, readFileSync(readme, 'utf8').replace(/^# .*$/m, `# ${answers.name}`));
 }
 
 /**
@@ -100,10 +100,10 @@ export function customize(dir: string, answers: Answers): void
  */
 export function writeEnv(dir: string, token: string): void
 {
-  const example = join(dir, '.env.example');
-  const lines = existsSync(example) ? readFileSync(example, 'utf8') : '';
-  const env = /^COHO_TOKEN=.*$/m.test(lines) ? lines.replace(/^COHO_TOKEN=.*$/m, `COHO_TOKEN=${token}`) : `COHO_TOKEN=${token}\n${lines}`;
-  writeFileSync(join(dir, '.env'), env, { mode: 0o600 });
+    const example = join(dir, '.env.example');
+    const lines = existsSync(example) ? readFileSync(example, 'utf8') : '';
+    const env = /^COHO_TOKEN=.*$/m.test(lines) ? lines.replace(/^COHO_TOKEN=.*$/m, `COHO_TOKEN=${token}`) : `COHO_TOKEN=${token}\n${lines}`;
+    writeFileSync(join(dir, '.env'), env, { mode: 0o600 });
 }
 
 /**
@@ -113,35 +113,35 @@ export function writeEnv(dir: string, token: string): void
  */
 export function pinSdk(dir: string, version: string): void
 {
-  editJson(join(dir, 'package.json'), (pkg) =>
-  {
-    const dev = (pkg['devDependencies'] ?? {}) as Record<string, string>;
-    for (const name of SDK) dev[name] = version;
-    pkg['devDependencies'] = dev;
+    editJson(join(dir, 'package.json'), (pkg) =>
+    {
+        const dev = (pkg['devDependencies'] ?? {}) as Record<string, string>;
+        for (const name of SDK) dev[name] = version;
+        pkg['devDependencies'] = dev;
 
-    const peer = (pkg['peerDependencies'] ?? {}) as Record<string, string>;
-    peer['@coho-cms/delivery'] = `^${version}`;
-    pkg['peerDependencies'] = peer;
-  });
-  rmSync(join(dir, 'package-lock.json'), { force: true });
+        const peer = (pkg['peerDependencies'] ?? {}) as Record<string, string>;
+        peer['@coho-cms/delivery'] = `^${version}`;
+        pkg['peerDependencies'] = peer;
+    });
+    rmSync(join(dir, 'package-lock.json'), { force: true });
 }
 
 /** Whether npm would accept [name], such as `@acme/content`. */
 export function isValidPackageName(name: string): boolean
 {
-  return name.length <= 214 && /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/.test(name);
+    return name.length <= 214 && /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/.test(name);
 }
 
 /** Whether [dir] can be created into: it does not exist, or holds nothing but a `.git`. */
 export function isFree(dir: string): boolean
 {
-  return !existsSync(dir) || readdirSync(dir).every((name) => name === '.git');
+    return !existsSync(dir) || readdirSync(dir).every((name) => name === '.git');
 }
 
 function editJson(path: string, edit: (json: Record<string, unknown>) => void): void
 {
-  if (!existsSync(path)) throw new CreateError(`The template has no ${basename(path)}`);
-  const json = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
-  edit(json);
-  writeFileSync(path, `${JSON.stringify(json, null, 2)}\n`);
+    if (!existsSync(path)) throw new CreateError(`The template has no ${basename(path)}`);
+    const json = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+    edit(json);
+    writeFileSync(path, `${JSON.stringify(json, null, 2)}\n`);
 }

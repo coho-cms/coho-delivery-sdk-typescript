@@ -13,8 +13,8 @@ const given = process.argv[2];
 const from = given === undefined ? undefined : resolve(process.env['INIT_CWD'] ?? process.cwd(), given);
 if (from === undefined || !existsSync(join(from, 'package.json')))
 {
-  console.error('Usage: npm run bundle -- <template folder>, a checkout of coho-template-typescript');
-  process.exit(1);
+    console.error('Usage: npm run bundle -- <template folder>, a checkout of coho-template-typescript');
+    process.exit(1);
 }
 
 const to = fileURLToPath(new URL('../template', import.meta.url));

@@ -25,31 +25,31 @@ export type Env = Readonly<Record<string, string | undefined>>;
  */
 export function configFromEnv(env: Env): ContentConfig
 {
-  const value = (name: string): string | undefined =>
-  {
-    const set = env[name]?.trim();
-    return set === undefined || set === '' ? undefined : set;
-  };
-  const token = value('COHO_PREVIEW_TOKEN');
-  const key = value('COHO_DELIVERY_KEY');
-  if (token !== undefined && key !== undefined)
-  {
-    throw new Error('Coho: set COHO_PREVIEW_TOKEN to preview unreleased content, or COHO_DELIVERY_KEY to read released content, not both');
-  }
+    const value = (name: string): string | undefined =>
+    {
+        const set = env[name]?.trim();
+        return set === undefined || set === '' ? undefined : set;
+    };
+    const token = value('COHO_PREVIEW_TOKEN');
+    const key = value('COHO_DELIVERY_KEY');
+    if (token !== undefined && key !== undefined)
+    {
+        throw new Error('Coho: set COHO_PREVIEW_TOKEN to preview unreleased content, or COHO_DELIVERY_KEY to read released content, not both');
+    }
 
-  const needed = token !== undefined
-    ? ['COHO_URL', 'COHO_ACCOUNT', 'COHO_PROJECT', 'COHO_REF']
-    : ['COHO_DELIVERY_URL', 'COHO_PROJECT', 'COHO_REF'];
-  const missing = needed.filter((name) => value(name) === undefined);
-  if (missing.length > 0)
-  {
-    const reading = token !== undefined ? 'a preview, since COHO_PREVIEW_TOKEN is set' : 'released content';
-    throw new Error(`Coho: ${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} needed to read ${reading}`);
-  }
+    const needed = token !== undefined
+        ? ['COHO_URL', 'COHO_ACCOUNT', 'COHO_PROJECT', 'COHO_REF']
+        : ['COHO_DELIVERY_URL', 'COHO_PROJECT', 'COHO_REF'];
+    const missing = needed.filter((name) => value(name) === undefined);
+    if (missing.length > 0)
+    {
+        const reading = token !== undefined ? 'a preview, since COHO_PREVIEW_TOKEN is set' : 'released content';
+        throw new Error(`Coho: ${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} needed to read ${reading}`);
+    }
 
-  // Checked present above, so each `!` names a variable the list required.
-  const common = { project: value('COHO_PROJECT')!, ref: value('COHO_REF')!, locale: value('COHO_LOCALE') };
-  return token !== undefined
-    ? { ...common, url: value('COHO_URL')!, account: value('COHO_ACCOUNT')!, token }
-    : { ...common, url: value('COHO_DELIVERY_URL')!, key };
+    // Checked present above, so each `!` names a variable the list required.
+    const common = { project: value('COHO_PROJECT')!, ref: value('COHO_REF')!, locale: value('COHO_LOCALE') };
+    return token !== undefined
+        ? { ...common, url: value('COHO_URL')!, account: value('COHO_ACCOUNT')!, token }
+        : { ...common, url: value('COHO_DELIVERY_URL')!, key };
 }
