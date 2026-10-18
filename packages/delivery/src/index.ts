@@ -9,4 +9,4 @@ export type { Env } from './env.ts';
 export { CohoDeliveryError } from './errors.ts';
 export { hydrate, isResolved } from './hydrate.ts';
 export type { EntryBase, HydratedEntry, HydrateOptions, Issue, Linked, LinkKind, Shape, TypeShape, Unresolved } from './hydrate.ts';
-export type { Entry, EntryGraph, EntryList, Problem, UnresolvedReason } from './types.ts';
+export type { DeliveryWarning, Entry, EntryGraph, EntryList, Problem, UnresolvedReason } from './types.ts';

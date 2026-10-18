@@ -43,6 +43,22 @@ export interface EntryGraph
     readonly entries: Readonly<Record<string, Entry>>;
 
     readonly unresolved: Readonly<Record<string, UnresolvedReason>>;
+
+    /**
+     * What the response could not give in full (delivery 2.1.0): an asset field whose
+     * asset is gone, which is then `null`, or left out of a list. Absent when there is
+     * nothing to say.
+     */
+    readonly warnings?: readonly DeliveryWarning[];
+}
+
+/** One warning. `code` says what, the rest says where. Show an unknown code; never fail on one. */
+export interface DeliveryWarning
+{
+    readonly code: 'ASSET_MISSING' | (string & {});
+    readonly entry: string;
+    readonly field: string;
+    readonly asset: string;
 }
 
 /** A page of a list. */
