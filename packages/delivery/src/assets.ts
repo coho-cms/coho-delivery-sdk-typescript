@@ -19,6 +19,9 @@
  */
 export interface Asset
 {
+    /** The asset's id: what the entry's field links. */
+    readonly id?: string;
+
     /** The original bytes, from the asset CDN. */
     readonly url?: string;
 
@@ -33,6 +36,21 @@ export interface Asset
     readonly title?: string;
     readonly alt?: string;
 }
+
+/**
+ * An asset whose field accepts only raster images (`image/png`, `image/jpeg`,
+ * `image/gif`, `image/webp`, `image/avif`, `image/heic`). Generated code types such a
+ * field with this, since every file it can link has pixel dimensions and resizes at the
+ * edge. A field that also accepts SVG, or any image, is an {@link Asset}.
+ */
+export interface ImageAsset extends Asset
+{
+    readonly imageUrl: string;
+    readonly file: AssetFile & { readonly width: number; readonly height: number };
+}
+
+/** The media types an {@link ImageAsset} can be: the raster images the edge resizes. */
+export const RASTER_IMAGE_TYPES: readonly string[] = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif', 'image/heic'];
 
 /** The bytes behind an asset, as the server sniffed them. */
 export interface AssetFile

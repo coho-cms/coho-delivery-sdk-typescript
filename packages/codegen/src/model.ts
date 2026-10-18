@@ -54,6 +54,9 @@ export interface Field
     readonly sortable: boolean;
     readonly many?: boolean;
 
+    /** On assets (IR 1.1): the media types a linked file may be, or family wildcards. Empty for any. */
+    readonly accept?: readonly string[];
+
     /** Reference targets, each a key of `types`; or a repeater's component types. */
     readonly of?: readonly string[];
 

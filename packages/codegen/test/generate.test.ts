@@ -11,7 +11,7 @@ import type { Field, Generated, TypeModel } from '../src/index.ts';
  * `npm run lint` holds to this repository's style. After an intended change, rewrite
  * them with `COHO_UPDATE_GOLDEN=1 npm test` and review the diff.
  */
-const FIXTURES = ['cli-next-blog', 'delivery-fixture'];
+const FIXTURES = ['cli-next-blog', 'delivery-fixture', 'assets'];
 
 function fixture(name: string): TypeModel
 {
@@ -152,6 +152,26 @@ test('repeater items are typed by their id until component types are', () =>
     assert.match(file(generated, 'RepeaterItem.ts'), /export type RepeaterItem = /);
     assert.match(file(generated, 'Page.ts'), /^import type \{ RepeaterItem \} from "\.\/RepeaterItem\.ts";$/m);
     assert.match(file(generated, 'Page.ts'), /readonly blocks\?: readonly RepeaterItem\[\];/);
+});
+
+test('an asset field is a nullable asset, a list with many, and an image asset when it accepts only raster images', () =>
+{
+    const contents = code(model({
+        page: [
+            { id: 'hero', kind: 'asset', many: false, accept: ['image/png', 'image/webp'] },
+            { id: 'logo', kind: 'asset', many: false, accept: ['image/*'] },
+            { id: 'files', kind: 'asset', many: true, accept: [] },
+            { id: 'cover', kind: 'asset', many: false, presence: 'always', required: true, accept: ['image/jpeg'] },
+        ],
+    }));
+
+    assert.match(contents, /readonly hero\?: runtime\.ImageAsset \| null;/);
+    // An image family includes SVG, which has no pixels to resize.
+    assert.match(contents, /readonly logo\?: runtime\.Asset \| null;/);
+    assert.match(contents, /readonly files\?: readonly runtime\.Asset\[\];/);
+    // Required, and still nullable: an asset that is gone on the ref is delivered as null.
+    assert.match(contents, /readonly cover: runtime\.ImageAsset \| null;/);
+    assert.match(contents, /Accepts image\/png, image\/webp\./);
 });
 
 test('choice values are escaped, and a display name cannot end its doc comment', () =>

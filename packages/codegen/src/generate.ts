@@ -203,6 +203,13 @@ function fieldType(type: ContentType, field: Field, nameOf: (slug: string) => st
             const target = targets.length === 0 ? 'runtime.HydratedEntry' : targets.map(nameOf).join(' | ');
             return field.many ? `readonly runtime.Linked<${target}>[]` : `runtime.Linked<${target}>`;
         }
+        case 'asset': {
+            // Embedded by delivery, never a link to follow. One that is gone on the ref
+            // is null, required or not, so a single asset is always nullable; in a many
+            // field a gone asset is left out (coho-sdk-spec, "Asset fields").
+            const asset = imageOnly(field) ? 'runtime.ImageAsset' : 'runtime.Asset';
+            return field.many ? `readonly ${asset}[]` : `${asset} | null`;
+        }
         case 'repeater':
             return 'readonly RepeaterItem[]';
         default:
@@ -220,9 +227,19 @@ function choices(field: Field): string
     return [...(field.values ?? []).map((value) => JSON.stringify(value)), '(string & {})'].join(' | ');
 }
 
+/** Whether every file the field accepts is a raster image, which always has dimensions. */
+function imageOnly(field: Field): boolean
+{
+    const accept = field.accept ?? [];
+    return accept.length > 0 && accept.every((type) => RASTER_IMAGES.has(type));
+}
+
+const RASTER_IMAGES: ReadonlySet<string> = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif', 'image/heic']);
+
 function note(field: Field): string
 {
     const notes: string[] = [];
+    if (field.kind === 'asset' && (field.accept ?? []).length > 0) notes.push(`Accepts ${(field.accept ?? []).join(', ')}.`);
     if (field.kind === 'longText' && field.textFormat === 'markdown') notes.push('Markdown.');
     if (field.kind === 'longText' && field.textFormat === 'html') notes.push('HTML.');
     if (field.kind === 'datetime') notes.push('An ISO 8601 date and time.');

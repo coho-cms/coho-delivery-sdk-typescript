@@ -58,6 +58,7 @@ const latest = await coho.blogPost.list({ order: '-publishedAt', limit: 3 });
 - **One interface per content type, in its own file**, named from its slug: `blogPost` becomes `BlogPost`, in `BlogPost.ts`. `index.ts` exports them all, with `createCoho`. Its fields sit beside the system keys `_id`, `_type`, `_slug` and `_locale`.
 - **A field is optional when delivery can leave it out**, which includes every localized field. A choice accepts values added after generation, so new content never breaks the build.
 - **References are typed by their targets**: `Linked<TeamMember>`, which is the entry, or a stub saying why it is not there.
+- **An asset field is an `Asset | null`**, or a `readonly Asset[]` when it holds several, and an `ImageAsset` when it accepts only raster images, which always have dimensions and resize. A single asset is nullable even when required, because an asset deleted on the ref is delivered as null; in a list it is left out. Build its URLs with `imageUrl` and `srcset` from `@coho-cms/delivery`, or `<CohoImage>` from `@coho-cms/react`. Delivery does not serve asset fields yet (coho-data doc 40 §14.6).
 - **`order` accepts only fields the type can be sorted by**, so an unsortable order is a compile error rather than a refused request.
 - **`AnyEntry`** is the union of every type; switch on `_type` to narrow it. `source` names the tag the code was generated from.
 - **The library reads no environment.** The app passes the delivery key to `createCoho`.
