@@ -1,6 +1,6 @@
 {
   "name": "@coho-cms/codegen",
-  "version": "0.1.0-alpha.5",
+  "version": "0.1.0-alpha.6",
   "description": "Generates a typed content library from your Coho CMS content types.",
   "license": "Apache-2.0",
   "type": "module",

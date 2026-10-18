@@ -1,3 +1,5 @@
+export { downloadUrl, IMAGE_WIDTHS, imageUrl, srcset } from './assets.ts';
+export type { Asset, AssetFile, ImageOptions, SrcsetOptions } from './assets.ts';
 export { createDeliveryClient } from './client.ts';
 export type { ClientOptions, DeliveryClient, DeliveryConfig, ListOptions, MountedConfig, PreviewConfig, ReadOptions, ReleasedConfig } from './client.ts';
 export { createContentClient } from './content.ts';

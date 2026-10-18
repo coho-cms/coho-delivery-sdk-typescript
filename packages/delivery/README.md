@@ -94,6 +94,27 @@ const content = createContentClient(configFromEnv(process.env));
 
 Setting a preview token and a delivery key together is refused, since they read different content. For a Next.js app, put them in `.env.local`, never with a `NEXT_PUBLIC_` prefix.
 
+## Assets
+
+`imageUrl`, `srcset` and `downloadUrl` build an asset's URLs from what the asset carries: no request, no secret, so they work on the server and in a browser alike. For React, `@coho-cms/react` wraps them in `<CohoImage>` and `<CohoAssetLink>`.
+
+```ts
+import { downloadUrl, imageUrl, srcset } from '@coho-cms/delivery';
+
+imageUrl(post.hero, { width: 800, format: 'auto' });                     // resized at the edge
+imageUrl(post.hero, { width: 400, height: 400, fit: 'fill' });           // cropped around its focal point
+srcset(post.hero, { format: 'auto' });                                    // 640w … up to the original
+srcset(post.hero, { width: 300, densities: [1, 2] });                     // 1x, 2x
+downloadUrl(post.brochure);                                               // the original, as an attachment
+```
+
+- **Only raster images resize.** An SVG, a PDF or any other file has only its original, which `imageUrl` and `srcset` return whatever the options.
+- **The edge snaps widths up** to `IMAGE_WIDTHS`, so a `srcset` built from them lands on cached images. A crop (`fill`, `crop`, `thumb`) centres on the asset's focal point.
+- **`downloadUrl` adds `dl=1`**, since a browser ignores `download` on a link to another origin. The edge does not honour it yet, so until it does the file opens in the browser.
+- **An asset is as public as its URL**, drafts included, and deleting it does not stop the URL working.
+
+The asset shape is the asset API's (`url`, `imageUrl`, `file`, `focalPoint`, `alt`, `title`). Delivery does not serve asset fields yet.
+
 ## Caching
 
 Each client keeps a private cache of responses, following `Cache-Control` and `ETag`. A tag named directly is fetched once. An environment is reused for its short `max-age`, then revalidated, which costs a `304` when nothing was promoted. A preview is fetched every time. Pass `cache: false` to turn it off.
