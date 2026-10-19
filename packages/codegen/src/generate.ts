@@ -36,8 +36,9 @@ const RESERVED_MEMBERS = new Set(['bySlug', 'byId', 'byIds']);
 
 /**
  * The TypeScript for a type model: a file per content type holding its interface,
- * such as `BlogPost.ts`, and `index.ts`, which exports them all with their union, the
- * shape the runtime hydrates with, the model's source, and `createCoho`.
+ * such as `BlogPost.ts`, one per component type, such as `Citation.ts`, and `index.ts`,
+ * which exports them all with the content types' union, the shape the runtime hydrates
+ * with, the model's source, and `createCoho`.
  *
  * A pure function of the model, so the same model always gives the same bytes and a
  * drift check can compare them. Nothing about the generator's own version is
@@ -53,13 +54,18 @@ export function generate(model: TypeModel): Generated
     }
 
     const types = Object.keys(model.types).sort().map((slug) => model.types[slug] as ContentType);
-    const names = interfaceNames(types, warnings);
+    // Since type model 1.2. Content and component types share one slug namespace, so
+    // they share one set of names too.
+    const components = Object.keys(model.components ?? {}).sort().map((slug) => model.components?.[slug] as ContentType);
+    const names = interfaceNames([...types, ...components], warnings);
     const nameOf = (slug: string): string => names.get(slug) ?? 'runtime.HydratedEntry';
-    const usesRepeaters = types.some((type) => type.fields.some((field) => field.kind === 'repeater'));
+    // Untyped items remain where a repeater names no component on the ref.
+    const usesRepeaters = [...types, ...components].some((type) => type.fields.some(untypedRepeater));
 
     const files = [
-        indexFile(model, types, nameOf, usesRepeaters, warnings),
+        indexFile(model, types, components, nameOf, usesRepeaters, warnings),
         ...types.map((type) => typeFile(type, names, nameOf, warnings)),
+        ...components.map((component) => typeFile(component, names, nameOf, warnings, 'component')),
     ];
     if (usesRepeaters) files.push(repeaterFile());
     sameFileCheck(files);
@@ -67,9 +73,16 @@ export function generate(model: TypeModel): Generated
 }
 
 /** `index.ts`: every type, and what reads them. */
-function indexFile(model: TypeModel, types: readonly ContentType[], nameOf: (slug: string) => string, usesRepeaters: boolean, warnings: string[]): GeneratedFile
+function indexFile(
+    model: TypeModel,
+    types: readonly ContentType[],
+    components: readonly ContentType[],
+    nameOf: (slug: string) => string,
+    usesRepeaters: boolean,
+    warnings: string[],
+): GeneratedFile
 {
-    const exported = types.map((type) => nameOf(type.slug));
+    const exported = [...types, ...components].map((type) => nameOf(type.slug)).sort();
     if (usesRepeaters) exported.push('RepeaterItem');
 
     const kind = model.source.immutable ? 'a tag' : 'a branch, whose types can change';
@@ -96,21 +109,32 @@ function indexFile(model: TypeModel, types: readonly ContentType[], nameOf: (slu
     return { path: 'index.ts', contents: `${out.join('\n')}\n` };
 }
 
-/** One content type's interface, importing the types it links to. */
-function typeFile(type: ContentType, names: ReadonlyMap<string, string>, nameOf: (slug: string) => string, warnings: string[]): GeneratedFile
+/**
+ * One content or component type's interface, importing the types it links to and the
+ * components its repeaters hold. A component is a repeater item, so it extends
+ * `ItemBase`, with an `_id` and `_type`, where a content type extends `EntryBase`.
+ */
+function typeFile(
+    type: ContentType,
+    names: ReadonlyMap<string, string>,
+    nameOf: (slug: string) => string,
+    warnings: string[],
+    kind: 'content' | 'component' = 'content',
+): GeneratedFile
 {
     const name = nameOf(type.slug);
     const linked = new Set<string>();
     for (const field of type.fields)
     {
-        if (field.kind === 'repeater') linked.add('RepeaterItem');
-        // A target not on the ref is an untyped entry, with nothing to import.
-        for (const slug of field.kind === 'reference' ? (field.of ?? []) : [])
+        if (untypedRepeater(field)) linked.add('RepeaterItem');
+        // A target or component not on the ref is untyped, with nothing to import.
+        for (const slug of field.kind === 'reference' || field.kind === 'repeater' ? (field.of ?? []) : [])
         {
             if (names.has(slug)) linked.add(nameOf(slug));
         }
     }
     linked.delete(name);
+    const base = kind === 'component' ? 'ItemBase' : 'EntryBase';
 
     const out = [
         HEADER,
@@ -118,8 +142,8 @@ function typeFile(type: ContentType, names: ReadonlyMap<string, string>, nameOf:
         'import type * as runtime from "@coho-cms/delivery";',
         ...[...linked].sort().map((other) => `import type { ${other} } from "./${other}.ts";`),
         '',
-        doc(type.name, ''),
-        `export interface ${name} extends runtime.EntryBase<${JSON.stringify(type.slug)}>`,
+        doc(type.name, kind === 'component' ? 'A repeater item, stored in the entry that holds it.' : ''),
+        `export interface ${name} extends runtime.${base}<${JSON.stringify(type.slug)}>`,
         '{',
     ];
     for (const [i, field] of type.fields.entries())
@@ -139,8 +163,8 @@ function repeaterFile(): GeneratedFile
     const out = [
         HEADER,
         '',
-        '/** An item of a repeater. Its own fields are not typed until component types are. */',
-        'export type RepeaterItem = { readonly _id: string; readonly [field: string]: unknown };',
+        '/** An item of a repeater whose component types are not on this ref, so its fields are not typed. */',
+        'export type RepeaterItem = { readonly _id: string; readonly _type?: string; readonly [field: string]: unknown };',
     ];
     return { path: 'RepeaterItem.ts', contents: `${out.join('\n')}\n` };
 }
@@ -210,8 +234,15 @@ function fieldType(type: ContentType, field: Field, nameOf: (slug: string) => st
             const asset = imageOnly(field) ? 'runtime.ImageAsset' : 'runtime.Asset';
             return field.many ? `readonly ${asset}[]` : `${asset} | null`;
         }
-        case 'repeater':
-            return 'readonly RepeaterItem[]';
+        case 'repeater': {
+            // A union on `_type` of the components on the ref. The runtime leaves out
+            // an item of any other component (`shape`'s `items`), so the union is never
+            // wrong about what it holds.
+            const components = field.of ?? [];
+            if (components.length === 0) return 'readonly RepeaterItem[]';
+            const union = components.map(nameOf).join(' | ');
+            return components.length === 1 ? `readonly ${union}[]` : `readonly (${union})[]`;
+        }
         default:
             warnings.push(`${type.slug}.${field.id} is a '${field.kind}', which this generator does not know; it is typed unknown. Upgrade @coho-cms/codegen.`);
             return 'unknown';
@@ -225,6 +256,12 @@ function fieldType(type: ContentType, field: Field, nameOf: (slug: string) => st
 function choices(field: Field): string
 {
     return [...(field.values ?? []).map((value) => JSON.stringify(value)), '(string & {})'].join(' | ');
+}
+
+/** A repeater that names no component on the ref, whose items are typed as {@link repeaterFile}'s. */
+function untypedRepeater(field: Field): boolean
+{
+    return field.kind === 'repeater' && (field.of ?? []).length === 0;
 }
 
 /** Whether every file the field accepts is a raster image, which always has dimensions. */
@@ -256,7 +293,7 @@ function doc(name: string, note: string): string
 
 function shapeOf(types: readonly ContentType[]): string[]
 {
-    const doc = '/** What the runtime needs to hydrate each type: its links, and the fields it always has. */';
+    const doc = '/** What the runtime needs to hydrate each type: its links, the fields it always has, and the components each repeater holds. */';
     if (types.length === 0) return [doc, 'export const shape: runtime.Shape = {};'];
     const lines = [doc, 'export const shape: runtime.Shape = {'];
     for (const type of types)
@@ -265,10 +302,14 @@ function shapeOf(types: readonly ContentType[]): string[]
             .filter((field) => field.kind === 'reference')
             .map((field) => `${field.id}: ${JSON.stringify(field.many ? 'many' : 'one')}`);
         const always = type.fields.filter((field) => field.presence === 'always').map((field) => JSON.stringify(field.id));
+        const items = type.fields
+            .filter((field) => field.kind === 'repeater' && !untypedRepeater(field))
+            .map((field) => `${field.id}: [${(field.of ?? []).map((slug) => JSON.stringify(slug)).join(', ')}]`);
 
         const parts: string[] = [];
         if (links.length > 0) parts.push(`links: { ${links.join(', ')} }`);
         if (always.length > 0) parts.push(`always: [${always.join(', ')}]`);
+        if (items.length > 0) parts.push(`items: { ${items.join(', ')} }`);
         lines.push(`${INDENT}${type.slug}: {${parts.length === 0 ? '' : ` ${parts.join(', ')} `}},`);
     }
     lines.push('};');

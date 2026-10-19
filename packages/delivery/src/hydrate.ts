@@ -15,6 +15,13 @@ export interface TypeShape
 
     /** The fields delivery always includes: required, and not localized. */
     readonly always?: readonly string[];
+
+    /**
+     * The repeater fields, by field id, each with the component types its generated
+     * code knows. An item of any other component is left out, and reported, so code
+     * generated before a component was added never meets an item it has no type for.
+     */
+    readonly items?: Readonly<Record<string, readonly string[]>>;
 }
 
 /** Type shapes, by content type slug. */
@@ -32,6 +39,16 @@ export interface EntryBase<T extends string = string>
 
     /** The locale the entry was projected for. Absent when none was requested. */
     readonly _locale?: string;
+}
+
+/**
+ * The system keys on every repeater item: its identity, stable across edits and
+ * merges, and the component type it is, which is what to switch on.
+ */
+export interface ItemBase<T extends string = string>
+{
+    readonly _id: string;
+    readonly _type: T;
 }
 
 /** An entry's fields beside its system keys, untyped. */
@@ -65,8 +82,10 @@ export interface Issue
      * a field becomes required. `unexpected-value`: one link where the type says many,
      * or the other way round. `unlisted-link`: a link delivery neither resolved nor
      * reported, which means the shape and the content disagree about the field.
+     * `unknown-item`: a repeater item of a component the shape does not list, left
+     * out; the code was generated before that component was added to the field.
      */
-    readonly kind: 'missing-field' | 'unexpected-value' | 'unlisted-link';
+    readonly kind: 'missing-field' | 'unexpected-value' | 'unlisted-link' | 'unknown-item';
 
     readonly id: string;
     readonly slug: string;
@@ -137,7 +156,18 @@ export function hydrate(graph: EntryGraph, shape: Shape = {}, options: HydrateOp
             for (const [field, value] of Object.entries(entry.fields))
             {
                 const kind = type?.links?.[field];
-                if (kind === undefined || value === null) out[field] = value;
+                const components = type?.items?.[field];
+                if (components !== undefined && Array.isArray(value))
+                {
+                    out[field] = value.filter((item: unknown) =>
+                    {
+                        const component = (item as { _type?: unknown } | null)?._type;
+                        if (typeof component === 'string' && components.includes(component)) return true;
+                        report('unknown-item', entry, field, `has an item of '${String(component)}' in '${field}', which this code has no type for; it is left out`);
+                        return false;
+                    });
+                }
+                else if (kind === undefined || value === null) out[field] = value;
                 else if (kind === 'many' && Array.isArray(value)) out[field] = value.map((id) => follow(entry, field, id));
                 else if (kind === 'one' && !Array.isArray(value)) out[field] = follow(entry, field, value);
                 else

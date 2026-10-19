@@ -14,6 +14,9 @@ export interface TypeModel
     /** Content types by slug. */
     readonly types: Readonly<Record<string, ContentType>>;
 
+    /** Component types by slug, the items repeaters hold. Since 1.2; absent before. */
+    readonly components?: Readonly<Record<string, ContentType>>;
+
     readonly warnings?: readonly ModelWarning[];
 }
 
@@ -57,7 +60,7 @@ export interface Field
     /** On assets (IR 1.1): the media types a linked file may be, or family wildcards. Empty for any. */
     readonly accept?: readonly string[];
 
-    /** Reference targets, each a key of `types`; or a repeater's component types. */
+    /** Reference targets, each a key of `types`; or a repeater's component types, each a key of `components`. */
     readonly of?: readonly string[];
 
     readonly values?: readonly string[];
@@ -113,6 +116,14 @@ export function readTypeModel(json: unknown): TypeModel
         if (!isObject(type) || !Array.isArray(type['fields']))
         {
             throw new CodegenError(`Type '${slug}' in the type model has no fields`);
+        }
+    }
+    if (json['components'] !== undefined && !isObject(json['components'])) throw new CodegenError('The type model\'s components are not an object');
+    for (const [slug, component] of Object.entries(isObject(json['components']) ? json['components'] : {}))
+    {
+        if (!isObject(component) || !Array.isArray(component['fields']))
+        {
+            throw new CodegenError(`Component type '${slug}' in the type model has no fields`);
         }
     }
     return json as unknown as TypeModel;

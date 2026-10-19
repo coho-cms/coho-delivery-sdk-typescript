@@ -11,7 +11,7 @@ import type { Field, Generated, TypeModel } from '../src/index.ts';
  * `npm run lint` holds to this repository's style. After an intended change, rewrite
  * them with `COHO_UPDATE_GOLDEN=1 npm test` and review the diff.
  */
-const FIXTURES = ['cli-next-blog', 'delivery-fixture', 'assets'];
+const FIXTURES = ['cli-next-blog', 'delivery-fixture', 'assets', 'repeaters'];
 
 function fixture(name: string): TypeModel
 {
@@ -22,7 +22,8 @@ for (const name of FIXTURES)
 {
     test(`${name} generates its expected files, byte for byte`, () =>
     {
-        const generated = generate(fixture(name));
+        const model = fixture(name);
+        const generated = generate(model);
         const expected = fileURLToPath(new URL(`./expected/${name}`, import.meta.url));
 
         if (process.env['COHO_UPDATE_GOLDEN'] === '1')
@@ -31,7 +32,8 @@ for (const name of FIXTURES)
             return;
         }
         assert.deepEqual(drift(generated.files, expected), []);
-        assert.deepEqual(generated.warnings, []);
+        // The fixtures are tags, so the only warnings are the model's own.
+        assert.deepEqual(generated.warnings, (model.warnings ?? []).map((each) => `${each.type}.${each.field}: ${each.message}`));
     });
 }
 
@@ -90,6 +92,12 @@ function model(types: Record<string, readonly Partial<Field>[]>, overrides: Part
     });
 }
 
+/** Component types for {@link model}'s overrides, filled out as {@link model} fills out types. */
+function components(types: Record<string, readonly Partial<Field>[]>): TypeModel['types']
+{
+    return model(types).types;
+}
+
 /** One generated file's contents, by its path. */
 function file(generated: Generated, path: string): string
 {
@@ -145,13 +153,43 @@ test('a link whose target type is not on the ref is an untyped entry', () =>
     assert.match(contents, /readonly author\?: runtime\.Linked<runtime\.HydratedEntry>;/);
 });
 
-test('repeater items are typed by their id until component types are', () =>
+test('a repeater whose components are not on the ref holds untyped items', () =>
 {
-    const generated = generate(model({ page: [{ id: 'blocks', kind: 'repeater', of: ['hero'] }] }));
+    const generated = generate(model({ page: [{ id: 'blocks', kind: 'repeater', of: [] }] }));
 
     assert.match(file(generated, 'RepeaterItem.ts'), /export type RepeaterItem = /);
     assert.match(file(generated, 'Page.ts'), /^import type \{ RepeaterItem \} from "\.\/RepeaterItem\.ts";$/m);
     assert.match(file(generated, 'Page.ts'), /readonly blocks\?: readonly RepeaterItem\[\];/);
+});
+
+test('a component type is an item interface of its own, and a repeater holds a union of them', () =>
+{
+    const generated = generate(model(
+        { page: [{ id: 'blocks', kind: 'repeater', of: ['hero', 'quote'] }, { id: 'refs', kind: 'repeater', of: ['quote'] }] },
+        { components: components({ hero: [{ id: 'headline' }], quote: [{ id: 'text', presence: 'always', required: true }] }) },
+    ));
+
+    assert.deepEqual(generated.files.map((each) => each.path), ['index.ts', 'Page.ts', 'Hero.ts', 'Quote.ts']);
+    assert.match(file(generated, 'Quote.ts'), /^export interface Quote extends runtime\.ItemBase<"quote">\n\{\n {4}\/\*\* text \*\/\n {4}readonly text: string;$/m);
+    const page = file(generated, 'Page.ts');
+    assert.match(page, /^import type \{ Hero \} from "\.\/Hero\.ts";\nimport type \{ Quote \} from "\.\/Quote\.ts";$/m);
+    assert.match(page, /readonly blocks\?: readonly \(Hero \| Quote\)\[\];/);
+    assert.match(page, /readonly refs\?: readonly Quote\[\];/);
+
+    const index = file(generated, 'index.ts');
+    // Exported, but not entries: no reader, and not in AnyEntry.
+    assert.match(index, /^export type \{ Quote \} from "\.\/Quote\.ts";$/m);
+    assert.match(index, /^export type AnyEntry = Page;$/m);
+    assert.doesNotMatch(index, /readonly quote:/);
+    assert.match(index, /^ {4}page: \{ items: \{ blocks: \["hero", "quote"\], refs: \["quote"\] \} \},$/m);
+});
+
+test('a component cannot share a name with a content type', () =>
+{
+    assert.throws(
+        () => generate(model({ quote: [] }, { components: components({ quote: [] }) })),
+        (error: unknown) => error instanceof CodegenError && /both be named Quote/.test(error.message),
+    );
 });
 
 test('an asset field is a nullable asset, a list with many, and an image asset when it accepts only raster images', () =>
