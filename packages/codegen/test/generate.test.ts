@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { CodegenError, drift, generate, readTypeModel, write } from '../src/index.ts';
 import type { Field, Generated, TypeModel } from '../src/index.ts';
+import type { AnyPage, LandingPage, Page, ServicePage } from './expected/inheritance/index.ts';
 
 /**
  * Each fixture's generated files are compared byte for byte with the ones checked in
@@ -11,7 +12,7 @@ import type { Field, Generated, TypeModel } from '../src/index.ts';
  * `npm run lint` holds to this repository's style. After an intended change, rewrite
  * them with `COHO_UPDATE_GOLDEN=1 npm test` and review the diff.
  */
-const FIXTURES = ['cli-next-blog', 'delivery-fixture', 'assets', 'repeaters'];
+const FIXTURES = ['cli-next-blog', 'delivery-fixture', 'assets', 'repeaters', 'inheritance'];
 
 function fixture(name: string): TypeModel
 {
@@ -90,6 +91,15 @@ function model(types: Record<string, readonly Partial<Field>[]>, overrides: Part
         ),
         ...overrides,
     });
+}
+
+/** {@link model}'s types, each extending the type [parents] names, and abstract where [abstract] lists it. */
+function extending(parents: Record<string, string>, abstract: readonly string[], types: TypeModel['types']): TypeModel['types']
+{
+    return Object.fromEntries(Object.entries(types).map(([slug, type]) => [
+        slug,
+        { ...type, ...(parents[slug] === undefined ? {} : { extends: parents[slug] }), ...(abstract.includes(slug) ? { abstract: true } : {}) },
+    ]));
 }
 
 /** Component types for {@link model}'s overrides, filled out as {@link model} fills out types. */
@@ -243,3 +253,61 @@ test('a type model of another major version is refused', () =>
         (error: unknown) => error instanceof CodegenError && /version 2\.0; this generator reads 1\.x/.test(error.message),
     );
 });
+
+test('a type with descendants is read and linked as its family, and an abstract one is in no entry\'s type', () =>
+{
+    const generated = generate(fixture('inheritance'));
+    const index = file(generated, 'index.ts');
+
+    // Delivery lists a type with its descendants.
+    assert.match(index, /^ {4}readonly page: runtime\.TypeReader<AnyPage, "rank">;$/m);
+    assert.match(index, /^ {4}readonly servicePage: runtime\.TypeReader<AnyServicePage, "rank">;$/m);
+    assert.match(index, /^ {4}readonly landingPage: runtime\.TypeReader<LandingPage, "rank">;$/m);
+    // A read of one entry by slug or id keeps it only if its `_type` is in the family.
+    assert.match(index, /^ {8}page: content\.type<AnyPage, "rank">\("page", \["landingPage", "premiumService", "servicePage"\]\),$/m);
+    assert.match(index, /^ {8}landingPage: content\.type<LandingPage, "rank">\("landingPage"\),$/m);
+    assert.match(index, /^export type AnyEntry = LandingPage \| Menu \| PremiumService \| ServicePage;$/m);
+    assert.doesNotMatch(index, /^ {4}page: \{/m);
+    // The runtime keeps an item only if its `_type` is listed, so a base component lists its family.
+    assert.match(index, /items: \{ blocks: \["quoteBlock", "textBlock"\] \}/);
+
+    assert.match(file(generated, 'Page.ts'), /^export interface Page extends runtime\.EntryBase<"landingPage" \| "premiumService" \| "servicePage">$/m);
+    assert.match(file(generated, 'Page.ts'), /^export type AnyPage = LandingPage \| PremiumService \| ServicePage;$/m);
+    assert.match(file(generated, 'Menu.ts'), /readonly featured\?: runtime\.Linked<AnyServicePage>;/);
+    assert.match(file(generated, 'ServicePage.ts'), /^\/\*\* Service page\. Extends Page, and has every field it has\. \*\/$/m);
+    // A type with no descendants has no family.
+    assert.doesNotMatch(code(fixture('inheritance')), /AnyPremiumService|AnyLandingPage|AnyMenu/);
+});
+
+test('a family whose alias a type already has is named <Type>Family, with a warning', () =>
+{
+    const generated = generate(model({}, {
+        types: extending({ post: 'page' }, [], model({ page: [], post: [], anyPage: [] }).types),
+    }));
+
+    assert.match(file(generated, 'Page.ts'), /^export type PageFamily = Page \| Post;$/m);
+    assert.match(file(generated, 'index.ts'), /readonly page: runtime\.TypeReader<PageFamily, never>;/);
+    assert.deepEqual(generated.warnings, ["The types that extend 'page' are named PageFamily, because AnyPage is taken."]);
+});
+
+test('an abstract type with no concrete descendants keeps its own _type, and has no family', () =>
+{
+    const abstract = model({}, { types: extending({ post: 'page' }, ['page', 'post'], model({ page: [], post: [] }).types) });
+    const generated = generate(abstract);
+
+    assert.match(file(generated, 'Page.ts'), /^export interface Page extends runtime\.EntryBase<"page">$/m);
+    assert.doesNotMatch(code(abstract), /AnyPage/);
+    assert.match(file(generated, 'index.ts'), /^export type AnyEntry = never;$/m);
+});
+
+/** Compiled by `npm run typecheck`, never called: the inheritance fixture's types relate as a hierarchy should. */
+export function aHierarchyByTheTypes(landing: LandingPage, service: ServicePage, any: AnyPage): void
+{
+    // Every member of a family has the abstract base's fields, and so is one.
+    const pages: Page[] = [landing, service, any];
+    void pages;
+    // An abstract type has no entries of its own.
+    // @ts-expect-error: no entry's _type is "page"
+    const own: Page['_type'] = 'page';
+    void own;
+}

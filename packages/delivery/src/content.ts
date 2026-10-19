@@ -70,9 +70,11 @@ export interface ContentClient<Any = HydratedEntry>
 
     /**
      * Reads of one content type. Generated code names `T` and the sortable fields `O`;
-     * without them, entries are untyped and any field may be ordered by.
+     * without them, entries are untyped and any field may be ordered by. Delivery lists a
+     * type with the types that extend it, so for a base type generated code also names
+     * `family`, the types an entry read here can be; without it, only `slug`'s own.
      */
-    type<T = HydratedEntry, O extends string = string>(slug: string): TypeReader<T, O>;
+    type<T = HydratedEntry, O extends string = string>(slug: string, family?: readonly string[]): TypeReader<T, O>;
 }
 
 export function createContentClient<Any = HydratedEntry>(config: ContentConfig, shape: Shape = {}): ContentClient<Any>
@@ -101,10 +103,10 @@ export function createContentClient<Any = HydratedEntry>(config: ContentConfig, 
         byId: async (id, asked) => first(await delivery.entry(config.ref, id, options(asked))) as Any | null,
         byIds: async (ids, asked) => all(await delivery.entriesById(config.ref, ids, options(asked))) as Any[],
 
-        type: <T = HydratedEntry, O extends string = string>(slug: string): TypeReader<T, O> =>
+        type: <T = HydratedEntry, O extends string = string>(slug: string, family: readonly string[] = [slug]): TypeReader<T, O> =>
         {
             // A slug is unique per ref, not per type, so a typed read checks what it found.
-            const ofType = (entry: HydratedEntry | null): T | null => (entry !== null && entry._type === slug ? (entry as T) : null);
+            const ofType = (entry: HydratedEntry | null): T | null => (entry !== null && family.includes(entry._type) ? (entry as T) : null);
             return {
                 bySlug: async (entrySlug, asked) => ofType(first(await delivery.entryBySlug(config.ref, entrySlug, options(asked)))),
                 byId: async (id, asked) => ofType(first(await delivery.entry(config.ref, id, options(asked)))),

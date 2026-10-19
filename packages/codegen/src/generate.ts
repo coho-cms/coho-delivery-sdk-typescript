@@ -59,13 +59,16 @@ export function generate(model: TypeModel): Generated
     const components = Object.keys(model.components ?? {}).sort().map((slug) => model.components?.[slug] as ContentType);
     const names = interfaceNames([...types, ...components], warnings);
     const nameOf = (slug: string): string => names.get(slug) ?? 'runtime.HydratedEntry';
+    // Since type model 1.3: delivery lists a type with its descendants, so a read or a
+    // link of a base type is any type in its family.
+    const family = families([...types, ...components], names, warnings);
     // Untyped items remain where a repeater names no component on the ref.
     const usesRepeaters = [...types, ...components].some((type) => type.fields.some(untypedRepeater));
 
     const files = [
-        indexFile(model, types, components, nameOf, usesRepeaters, warnings),
-        ...types.map((type) => typeFile(type, names, nameOf, warnings)),
-        ...components.map((component) => typeFile(component, names, nameOf, warnings, 'component')),
+        indexFile(model, types, components, nameOf, family, usesRepeaters, warnings),
+        ...types.map((type) => typeFile(type, names, nameOf, family, warnings)),
+        ...components.map((component) => typeFile(component, names, nameOf, family, warnings, 'component')),
     ];
     if (usesRepeaters) files.push(repeaterFile());
     sameFileCheck(files);
@@ -78,12 +81,29 @@ function indexFile(
     types: readonly ContentType[],
     components: readonly ContentType[],
     nameOf: (slug: string) => string,
+    family: Families,
     usesRepeaters: boolean,
     warnings: string[],
 ): GeneratedFile
 {
-    const exported = [...types, ...components].map((type) => nameOf(type.slug)).sort();
-    if (usesRepeaters) exported.push('RepeaterItem');
+    // Each name with the file it is in: a family's alias is in its base type's file.
+    const exported: [string, string][] = [];
+    for (const type of [...types, ...components])
+    {
+        exported.push([nameOf(type.slug), nameOf(type.slug)]);
+        if (family.has(type.slug)) exported.push([family.alias(type.slug), nameOf(type.slug)]);
+    }
+    exported.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    if (usesRepeaters) exported.push(['RepeaterItem', 'RepeaterItem']);
+    // An abstract type has no entries of its own, so it is not one of the types an entry is.
+    const concrete = types.filter((type) => type.abstract !== true);
+    const imported = new Map<string, Set<string>>();
+    const use = (name: string, file: string): void =>
+    {
+        (imported.get(file) ?? imported.set(file, new Set()).get(file))?.add(name);
+    };
+    for (const type of concrete) use(nameOf(type.slug), nameOf(type.slug));
+    for (const type of types) use(family.target(type.slug), nameOf(type.slug));
 
     const kind = model.source.immutable ? 'a tag' : 'a branch, whose types can change';
     const out = [
@@ -91,20 +111,20 @@ function indexFile(
         `// Project ${model.source.project}, ref ${model.source.ref} (${kind}), schema ${model.source.schemaHash}, type model ${model.irVersion}.`,
         '',
         'import * as runtime from "@coho-cms/delivery";',
-        ...types.map((type) => `import type { ${nameOf(type.slug)} } from "./${nameOf(type.slug)}.ts";`),
+        ...[...imported.keys()].sort().map((file) => `import type { ${[...(imported.get(file) ?? [])].sort().join(', ')} } from "./${file}.ts";`),
         '',
         'export { isResolved } from "@coho-cms/delivery";',
         'export type { Linked, Unresolved } from "@coho-cms/delivery";',
-        ...exported.map((name) => `export type { ${name} } from "./${name}.ts";`),
+        ...exported.map(([name, file]) => `export type { ${name} } from "./${file}.ts";`),
         '',
         '/** Any content type on this ref. Switch on `_type` to narrow it. */',
-        `export type AnyEntry = ${types.length === 0 ? 'never' : types.map((type) => nameOf(type.slug)).join(' | ')};`,
+        `export type AnyEntry = ${concrete.length === 0 ? 'never' : concrete.map((type) => nameOf(type.slug)).join(' | ')};`,
         '',
-        ...shapeOf(types),
+        ...shapeOf(concrete, family),
         '',
         ...sourceOf(model),
         '',
-        ...client(types, nameOf, warnings),
+        ...client(types, nameOf, family, warnings),
     ];
     return { path: 'index.ts', contents: `${out.join('\n')}\n` };
 }
@@ -118,32 +138,48 @@ function typeFile(
     type: ContentType,
     names: ReadonlyMap<string, string>,
     nameOf: (slug: string) => string,
+    family: Families,
     warnings: string[],
     kind: 'content' | 'component' = 'content',
 ): GeneratedFile
 {
     const name = nameOf(type.slug);
-    const linked = new Set<string>();
+    // Each name this file uses, by the file it is in.
+    const linked = new Map<string, Set<string>>();
+    const use = (other: string, file: string): void =>
+    {
+        if (file !== name) (linked.get(file) ?? linked.set(file, new Set()).get(file))?.add(other);
+    };
     for (const field of type.fields)
     {
-        if (untypedRepeater(field)) linked.add('RepeaterItem');
+        if (untypedRepeater(field)) use('RepeaterItem', 'RepeaterItem');
         // A target or component not on the ref is untyped, with nothing to import.
         for (const slug of field.kind === 'reference' || field.kind === 'repeater' ? (field.of ?? []) : [])
         {
-            if (names.has(slug)) linked.add(nameOf(slug));
+            if (names.has(slug)) use(family.target(slug), nameOf(slug));
         }
     }
-    linked.delete(name);
+    // A family's alias lists every concrete type in it, from their own files.
+    const members = family.has(type.slug) ? family.members(type.slug) : [];
+    for (const member of members) use(nameOf(member), nameOf(member));
     const base = kind === 'component' ? 'ItemBase' : 'EntryBase';
+    // An abstract type's entries are its descendants', so its `_type` is any of theirs.
+    const discriminant = type.abstract === true && members.length > 0
+        ? members.map((member) => JSON.stringify(member)).join(' | ')
+        : JSON.stringify(type.slug);
 
     const out = [
         HEADER,
         '',
         'import type * as runtime from "@coho-cms/delivery";',
-        ...[...linked].sort().map((other) => `import type { ${other} } from "./${other}.ts";`),
+        ...[...linked.keys()].sort().map((file) => `import type { ${[...(linked.get(file) ?? [])].sort().join(', ')} } from "./${file}.ts";`),
         '',
-        doc(type.name, kind === 'component' ? 'A repeater item, stored in the entry that holds it.' : ''),
-        `export interface ${name} extends runtime.${base}<${JSON.stringify(type.slug)}>`,
+        doc(type.name, [
+            kind === 'component' ? 'A repeater item, stored in the entry that holds it.' : '',
+            type.extends !== undefined && names.has(type.extends) ? `Extends ${nameOf(type.extends)}, and has every field it has.` : '',
+            type.abstract === true ? `Abstract: ${kind === 'component' ? 'an item' : 'an entry'} is one of the types that extend it.` : '',
+        ].filter((part) => part !== '').join(' ')),
+        `export interface ${name} extends runtime.${base}<${discriminant}>`,
         '{',
     ];
     for (const [i, field] of type.fields.entries())
@@ -152,10 +188,82 @@ function typeFile(
         if (i > 0) out.push('');
         out.push(`${INDENT}${doc(field.name, note(field))}`);
         const optional = field.presence === 'always' ? '' : '?';
-        out.push(`${INDENT}readonly ${field.id}${optional}: ${fieldType(type, field, nameOf, warnings)};`);
+        out.push(`${INDENT}readonly ${field.id}${optional}: ${fieldType(type, field, family, warnings)};`);
     }
     out.push('}');
+    if (members.length > 0)
+    {
+        out.push(
+            '',
+            doc(`A ${type.name} of any kind: ${members.map(nameOf).join(', ')}`, 'Switch on `_type` to narrow it.'),
+            `export type ${family.alias(type.slug)} = ${members.map(nameOf).join(' | ')};`,
+        );
+    }
     return { path: `${name}.ts`, contents: `${out.join('\n')}\n` };
+}
+
+/**
+ * Type inheritance (type model 1.3). Delivery lists a type with its descendants, and a
+ * link or an item of a base type may be any of them, so a base type has a **family**:
+ * the concrete types an entry or item of it can be, itself unless abstract and every
+ * concrete descendant. A type with descendants is read and linked as its family's alias,
+ * `AnyPage`; a type with none, as itself. Interfaces stay flattened, as the model is,
+ * so no subtype has to redeclare the `_type` it narrows.
+ */
+interface Families
+{
+    /** Whether [slug] has descendants, and so a family alias. */
+    has(slug: string): boolean;
+
+    /** The concrete types in [slug]'s family, sorted by slug. */
+    members(slug: string): readonly string[];
+
+    /** [slug]'s family alias, `AnyPage`. */
+    alias(slug: string): string;
+
+    /** How a read or a link of [slug] is typed: its family's alias, or itself. */
+    target(slug: string): string;
+}
+
+function families(types: readonly ContentType[], names: ReadonlyMap<string, string>, warnings: string[]): Families
+{
+    const bySlug = new Map(types.map((type) => [type.slug, type]));
+    const below = new Map<string, string[]>();
+    for (const type of types)
+    {
+        // Each ancestor on the ref, cycle-guarded: the server refuses a cycle, so this only stops a broken file.
+        const seen = new Set([type.slug]);
+        let parent = type.extends;
+        while (parent !== undefined && bySlug.has(parent) && !seen.has(parent))
+        {
+            seen.add(parent);
+            (below.get(parent) ?? below.set(parent, []).get(parent))?.push(type.slug);
+            parent = bySlug.get(parent)?.extends;
+        }
+    }
+    const taken = new Set(names.values());
+    const aliases = new Map<string, string>();
+    for (const slug of [...below.keys()].sort())
+    {
+        const name = names.get(slug) ?? slug;
+        let alias = `Any${name}`;
+        if (taken.has(alias) || RESERVED_TYPE_NAMES.has(alias))
+        {
+            warnings.push(`The types that extend '${slug}' are named ${name}Family, because ${alias} is taken.`);
+            alias = `${name}Family`;
+        }
+        if (taken.has(alias)) throw new CodegenError(`The family of '${slug}' would be named ${alias}, which a type already is; rename one of them`);
+        taken.add(alias);
+        aliases.set(slug, alias);
+    }
+    const members = (slug: string): readonly string[] =>
+        [slug, ...(below.get(slug) ?? [])].filter((each) => bySlug.get(each)?.abstract !== true).sort();
+    return {
+        has: (slug) => aliases.has(slug) && members(slug).length > 0,
+        members,
+        alias: (slug) => aliases.get(slug) ?? names.get(slug) ?? slug,
+        target: (slug) => (aliases.has(slug) && members(slug).length > 0 ? (aliases.get(slug) ?? slug) : (names.get(slug) ?? 'runtime.HydratedEntry')),
+    };
 }
 
 function repeaterFile(): GeneratedFile
@@ -202,7 +310,7 @@ function interfaceNames(types: readonly ContentType[], warnings: string[]): Map<
 }
 
 /** The TypeScript type of one field's value, following the type model's mapping rules. */
-function fieldType(type: ContentType, field: Field, nameOf: (slug: string) => string, warnings: string[]): string
+function fieldType(type: ContentType, field: Field, family: Families, warnings: string[]): string
 {
     switch (field.kind)
     {
@@ -224,7 +332,8 @@ function fieldType(type: ContentType, field: Field, nameOf: (slug: string) => st
         case 'reference': {
             // An empty `of` means the target's type is not on this ref: an untyped entry.
             const targets = field.of ?? [];
-            const target = targets.length === 0 ? 'runtime.HydratedEntry' : targets.map(nameOf).join(' | ');
+            // A base type links to any type in its family (type model 1.3).
+            const target = targets.length === 0 ? 'runtime.HydratedEntry' : [...new Set(targets.map(family.target))].join(' | ');
             return field.many ? `readonly runtime.Linked<${target}>[]` : `runtime.Linked<${target}>`;
         }
         case 'asset': {
@@ -240,8 +349,9 @@ function fieldType(type: ContentType, field: Field, nameOf: (slug: string) => st
             // wrong about what it holds.
             const components = field.of ?? [];
             if (components.length === 0) return 'readonly RepeaterItem[]';
-            const union = components.map(nameOf).join(' | ');
-            return components.length === 1 ? `readonly ${union}[]` : `readonly (${union})[]`;
+            const kinds = [...new Set(components.map(family.target))];
+            const union = kinds.join(' | ');
+            return kinds.length === 1 ? `readonly ${union}[]` : `readonly (${union})[]`;
         }
         default:
             warnings.push(`${type.slug}.${field.id} is a '${field.kind}', which this generator does not know; it is typed unknown. Upgrade @coho-cms/codegen.`);
@@ -291,7 +401,7 @@ function doc(name: string, note: string): string
     return `/** ${text} */`;
 }
 
-function shapeOf(types: readonly ContentType[]): string[]
+function shapeOf(types: readonly ContentType[], family: Families): string[]
 {
     const doc = '/** What the runtime needs to hydrate each type: its links, the fields it always has, and the components each repeater holds. */';
     if (types.length === 0) return [doc, 'export const shape: runtime.Shape = {};'];
@@ -304,7 +414,9 @@ function shapeOf(types: readonly ContentType[]): string[]
         const always = type.fields.filter((field) => field.presence === 'always').map((field) => JSON.stringify(field.id));
         const items = type.fields
             .filter((field) => field.kind === 'repeater' && !untypedRepeater(field))
-            .map((field) => `${field.id}: [${(field.of ?? []).map((slug) => JSON.stringify(slug)).join(', ')}]`);
+            // The concrete components: the runtime keeps an item only if its `_type` is listed,
+            // and an item of a base component is always one of its family (type model 1.3).
+            .map((field) => `${field.id}: [${[...new Set((field.of ?? []).flatMap((slug) => (family.has(slug) ? family.members(slug) : [slug])))].map((slug) => JSON.stringify(slug)).join(', ')}]`);
 
         const parts: string[] = [];
         if (links.length > 0) parts.push(`links: { ${links.join(', ')} }`);
@@ -330,7 +442,7 @@ function sourceOf(model: TypeModel): string[]
     ];
 }
 
-function client(types: readonly ContentType[], nameOf: (slug: string) => string, warnings: string[]): string[]
+function client(types: readonly ContentType[], nameOf: (slug: string) => string, family: Families, warnings: string[]): string[]
 {
     const members = new Set<string>();
     const readers = types.map((type) =>
@@ -344,7 +456,8 @@ function client(types: readonly ContentType[], nameOf: (slug: string) => string,
         if (members.has(member)) throw new CodegenError(`Two types would both be read as coho.${member}; rename one of them`);
         members.add(member);
         const sortable = type.fields.filter((field) => field.sortable).map((field) => JSON.stringify(field.id));
-        const generic = `${nameOf(type.slug)}, ${sortable.length === 0 ? 'never' : sortable.join(' | ')}`;
+        // A type's read lists its descendants too (type model 1.3), so it reads its family.
+        const generic = `${family.target(type.slug)}, ${sortable.length === 0 ? 'never' : sortable.join(' | ')}`;
         return { type, member, generic };
     });
 
@@ -375,7 +488,9 @@ function client(types: readonly ContentType[], nameOf: (slug: string) => string,
     );
     for (const { type, member, generic } of readers)
     {
-        lines.push(`${INDENT}${INDENT}${member}: content.type<${generic}>(${JSON.stringify(type.slug)}),`);
+        // A typed read of one entry checks its `_type`, which for a base type is any in its family.
+        const kinds = family.has(type.slug) ? `, [${family.members(type.slug).map((slug) => JSON.stringify(slug)).join(', ')}]` : '';
+        lines.push(`${INDENT}${INDENT}${member}: content.type<${generic}>(${JSON.stringify(type.slug)}${kinds}),`);
     }
     lines.push(
         `${INDENT}${INDENT}bySlug: content.bySlug,`,

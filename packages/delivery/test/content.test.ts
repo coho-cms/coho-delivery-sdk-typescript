@@ -52,6 +52,17 @@ test('a slug of another type is null, the same as no entry', async () =>
     assert.equal(await bare.client.type('article').bySlug('nope'), null);
 });
 
+test('a read of a base type finds an entry of any type in its family', async () =>
+{
+    const { client } = content();
+
+    // As generated code reads a base type that `article` extends.
+    const chain = await client.type('page', ['article', 'landing']).bySlug('chain-1', { depth: 2 });
+
+    assert.equal(chain?._type, 'article');
+    assert.equal(await client.type('page', ['landing']).bySlug('chain-1', { depth: 2 }), null);
+});
+
 test('the configured locale is sent, unless a read names its own', async () =>
 {
     const { articles, calls } = content();

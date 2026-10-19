@@ -38,6 +38,13 @@ export interface ContentType
     readonly slug: string;
     readonly name: string;
     readonly version: string;
+
+    /** Since 1.3: the slug of the type this one extends, a key of the same map. Its `fields` already include what it inherits. */
+    readonly extends?: string;
+
+    /** Since 1.3: no entry is of this type itself, only its descendants. */
+    readonly abstract?: boolean;
+
     readonly fields: readonly Field[];
 }
 
@@ -65,6 +72,10 @@ export interface Field
 
     readonly values?: readonly string[];
     readonly textFormat?: string;
+
+    /** Since 1.3: the field reaches this type exactly as its parent has it. TypeScript's types are structural, so the generator declares it anyway. */
+    readonly inherited?: boolean;
+
     readonly min?: number;
     readonly max?: number;
 }
