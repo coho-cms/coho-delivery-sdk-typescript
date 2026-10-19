@@ -1,5 +1,5 @@
 import { CodegenError } from './model.ts';
-import type { ContentType, Field, TypeModel } from './model.ts';
+import type { ContentType, Field, Trait, TypeModel } from './model.ts';
 
 export interface GeneratedFile
 {
@@ -57,7 +57,10 @@ export function generate(model: TypeModel): Generated
     // Since type model 1.2. Content and component types share one slug namespace, so
     // they share one set of names too.
     const components = Object.keys(model.components ?? {}).sort().map((slug) => model.components?.[slug] as ContentType);
-    const names = interfaceNames([...types, ...components], warnings);
+    // Since type model 1.4: a trait is an interface every type with it extends. Traits
+    // share the slug namespace too, and with it the names.
+    const traits = Object.keys(model.traits ?? {}).sort().map((slug) => model.traits?.[slug] as Trait);
+    const names = interfaceNames([...types, ...components, ...traits], warnings);
     const nameOf = (slug: string): string => names.get(slug) ?? 'runtime.HydratedEntry';
     // Since type model 1.3: delivery lists a type with its descendants, so a read or a
     // link of a base type is any type in its family.
@@ -66,9 +69,10 @@ export function generate(model: TypeModel): Generated
     const usesRepeaters = [...types, ...components].some((type) => type.fields.some(untypedRepeater));
 
     const files = [
-        indexFile(model, types, components, nameOf, family, usesRepeaters, warnings),
+        indexFile(model, types, components, traits, nameOf, family, usesRepeaters, warnings),
         ...types.map((type) => typeFile(type, names, nameOf, family, warnings)),
         ...components.map((component) => typeFile(component, names, nameOf, family, warnings, 'component')),
+        ...traits.map((trait) => traitFile(trait, names, nameOf, family, warnings)),
     ];
     if (usesRepeaters) files.push(repeaterFile());
     sameFileCheck(files);
@@ -80,6 +84,7 @@ function indexFile(
     model: TypeModel,
     types: readonly ContentType[],
     components: readonly ContentType[],
+    traits: readonly Trait[],
     nameOf: (slug: string) => string,
     family: Families,
     usesRepeaters: boolean,
@@ -93,6 +98,7 @@ function indexFile(
         exported.push([nameOf(type.slug), nameOf(type.slug)]);
         if (family.has(type.slug)) exported.push([family.alias(type.slug), nameOf(type.slug)]);
     }
+    for (const trait of traits) exported.push([nameOf(trait.slug), nameOf(trait.slug)]);
     exported.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
     if (usesRepeaters) exported.push(['RepeaterItem', 'RepeaterItem']);
     // An abstract type has no entries of its own, so it is not one of the types an entry is.
@@ -162,6 +168,9 @@ function typeFile(
     // A family's alias lists every concrete type in it, from their own files.
     const members = family.has(type.slug) ? family.members(type.slug) : [];
     for (const member of members) use(nameOf(member), nameOf(member));
+    // Since type model 1.4: every trait it has, so code written against a trait takes it.
+    const traits = (type.traits ?? []).filter((slug) => names.has(slug)).map(nameOf);
+    for (const trait of traits) use(trait, trait);
     const base = kind === 'component' ? 'ItemBase' : 'EntryBase';
     // An abstract type's entries are its descendants', so its `_type` is any of theirs.
     const discriminant = type.abstract === true && members.length > 0
@@ -178,8 +187,9 @@ function typeFile(
             kind === 'component' ? 'A repeater item, stored in the entry that holds it.' : '',
             type.extends !== undefined && names.has(type.extends) ? `Extends ${nameOf(type.extends)}, and has every field it has.` : '',
             type.abstract === true ? `Abstract: ${kind === 'component' ? 'an item' : 'an entry'} is one of the types that extend it.` : '',
+            traits.length > 0 ? `Has the trait${traits.length === 1 ? '' : 's'} ${listed(traits)}.` : '',
         ].filter((part) => part !== '').join(' ')),
-        `export interface ${name} extends runtime.${base}<${discriminant}>`,
+        `export interface ${name} extends ${[`runtime.${base}<${discriminant}>`, ...traits].join(', ')}`,
         '{',
     ];
     for (const [i, field] of type.fields.entries())
@@ -199,6 +209,54 @@ function typeFile(
             `export type ${family.alias(type.slug)} = ${members.map(nameOf).join(' | ')};`,
         );
     }
+    return { path: `${name}.ts`, contents: `${out.join('\n')}\n` };
+}
+
+/** `A`, `A and B`, or `A, B, and C`. */
+function listed(names: readonly string[]): string
+{
+    if (names.length <= 2) return names.join(' and ');
+    return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
+}
+
+/**
+ * A trait (type model 1.4): an interface of the fields it declares, which every type that
+ * has it extends. Each type still declares those fields itself, as it has them, which may
+ * be tighter than the trait's; TypeScript checks that each is. So a function that takes a
+ * `Seo` takes an entry of any type with the trait.
+ */
+function traitFile(trait: Trait, names: ReadonlyMap<string, string>, nameOf: (slug: string) => string, family: Families, warnings: string[]): GeneratedFile
+{
+    const name = nameOf(trait.slug);
+    const linked = new Map<string, Set<string>>();
+    for (const field of trait.fields)
+    {
+        if (untypedRepeater(field)) (linked.get('RepeaterItem') ?? linked.set('RepeaterItem', new Set()).get('RepeaterItem'))?.add('RepeaterItem');
+        for (const slug of field.kind === 'reference' || field.kind === 'repeater' ? (field.of ?? []) : [])
+        {
+            if (names.has(slug)) (linked.get(nameOf(slug)) ?? linked.set(nameOf(slug), new Set()).get(nameOf(slug)))?.add(family.target(slug));
+        }
+    }
+    const asType: ContentType = { slug: trait.slug, name: trait.name, version: trait.version, fields: trait.fields };
+    const uses = trait.fields.some((field) => /runtime\./.test(fieldType(asType, field, family, [])));
+    const out = [
+        HEADER,
+        '',
+        ...(uses ? ['import type * as runtime from "@coho-cms/delivery";'] : []),
+        ...[...linked.keys()].sort().map((file) => `import type { ${[...(linked.get(file) ?? [])].sort().join(', ')} } from "./${file}.ts";`),
+        ...(uses || linked.size > 0 ? [''] : []),
+        doc(trait.name, 'A trait: fields that every type with it has. Take it to accept an entry of any of them.'),
+        `export interface ${name}`,
+        '{',
+    ];
+    for (const [i, field] of trait.fields.entries())
+    {
+        if (i > 0) out.push('');
+        out.push(`${INDENT}${doc(field.name, note(field))}`);
+        const optional = field.presence === 'always' ? '' : '?';
+        out.push(`${INDENT}readonly ${field.id}${optional}: ${fieldType(asType, field, family, warnings)};`);
+    }
+    out.push('}');
     return { path: `${name}.ts`, contents: `${out.join('\n')}\n` };
 }
 

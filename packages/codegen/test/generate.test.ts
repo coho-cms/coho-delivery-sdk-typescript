@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { CodegenError, drift, generate, readTypeModel, write } from '../src/index.ts';
 import type { Field, Generated, TypeModel } from '../src/index.ts';
 import type { AnyPage, LandingPage, Page, ServicePage } from './expected/inheritance/index.ts';
+import type { Article, Person, Page as TraitPage, Seo, SocialCard } from './expected/traits/index.ts';
 
 /**
  * Each fixture's generated files are compared byte for byte with the ones checked in
@@ -12,7 +13,7 @@ import type { AnyPage, LandingPage, Page, ServicePage } from './expected/inherit
  * `npm run lint` holds to this repository's style. After an intended change, rewrite
  * them with `COHO_UPDATE_GOLDEN=1 npm test` and review the diff.
  */
-const FIXTURES = ['cli-next-blog', 'delivery-fixture', 'assets', 'repeaters', 'inheritance'];
+const FIXTURES = ['cli-next-blog', 'delivery-fixture', 'assets', 'repeaters', 'inheritance', 'traits'];
 
 function fixture(name: string): TypeModel
 {
@@ -310,4 +311,30 @@ export function aHierarchyByTheTypes(landing: LandingPage, service: ServicePage,
     // @ts-expect-error: no entry's _type is "page"
     const own: Page['_type'] = 'page';
     void own;
+}
+
+test('a trait is an interface every type with it extends, and is in no entry\'s type', () =>
+{
+    const generated = generate(fixture('traits'));
+
+    assert.match(file(generated, 'Article.ts'), /^export interface Article extends runtime\.EntryBase<"article">, Seo, Publishing, SocialCard$/m);
+    assert.match(file(generated, 'Article.ts'), /Has the traits Seo, Publishing, and SocialCard\./);
+    assert.match(file(generated, 'Seo.ts'), /^export interface Seo\n\{\n {4}\/\*\* Meta title\. Absent where the locale has no translation\. \*\/$/m);
+    const index = file(generated, 'index.ts');
+    assert.match(index, /^export type \{ Seo \} from "\.\/Seo\.ts";$/m);
+    // Not a type: no reader, not in AnyEntry.
+    assert.doesNotMatch(index, /readonly seo:/);
+    assert.match(index, /^export type AnyEntry = Article \| Page \| Person;$/m);
+});
+
+/** Compiled by `npm run typecheck`, never called: code written against a trait takes every type with it. */
+export function aTraitByTheTypes(article: Article, page: TraitPage, person: Person): void
+{
+    const described: Seo[] = [article, page];
+    const shared: SocialCard[] = [article, person];
+    void described;
+    void shared;
+    // @ts-expect-error: a person does not have the SEO trait
+    const notSeo: Seo = person as Person & { metaTitle: number };
+    void notSeo;
 }

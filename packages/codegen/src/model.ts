@@ -17,6 +17,9 @@ export interface TypeModel
     /** Component types by slug, the items repeaters hold. Since 1.2; absent before. */
     readonly components?: Readonly<Record<string, ContentType>>;
 
+    /** Since 1.4: traits by slug, named groups of fields that types take. Never types. Absent when the ref has none. */
+    readonly traits?: Readonly<Record<string, Trait>>;
+
     readonly warnings?: readonly ModelWarning[];
 }
 
@@ -45,6 +48,18 @@ export interface ContentType
     /** Since 1.3: no entry is of this type itself, only its descendants. */
     readonly abstract?: boolean;
 
+    /** Since 1.4: every trait it has, each a key of `traits`, its ancestors' first. Its `fields` already include theirs. */
+    readonly traits?: readonly string[];
+
+    readonly fields: readonly Field[];
+}
+
+/** Since 1.4: a trait, with its fields as it declares them. */
+export interface Trait
+{
+    readonly slug: string;
+    readonly name: string;
+    readonly version: string;
     readonly fields: readonly Field[];
 }
 
@@ -75,6 +90,9 @@ export interface Field
 
     /** Since 1.3: the field reaches this type exactly as its parent has it. TypeScript's types are structural, so the generator declares it anyway. */
     readonly inherited?: boolean;
+
+    /** Since 1.4: the trait the field comes from, a key of `traits`. As this type has it, which may be tighter than the trait's. */
+    readonly trait?: string;
 
     readonly min?: number;
     readonly max?: number;
@@ -128,6 +146,11 @@ export function readTypeModel(json: unknown): TypeModel
         {
             throw new CodegenError(`Type '${slug}' in the type model has no fields`);
         }
+    }
+    if (json['traits'] !== undefined && !isObject(json['traits'])) throw new CodegenError('The type model\'s traits are not an object');
+    for (const [slug, trait] of Object.entries(isObject(json['traits']) ? json['traits'] : {}))
+    {
+        if (!isObject(trait) || !Array.isArray(trait['fields'])) throw new CodegenError(`Trait '${slug}' in the type model has no fields`);
     }
     if (json['components'] !== undefined && !isObject(json['components'])) throw new CodegenError('The type model\'s components are not an object');
     for (const [slug, component] of Object.entries(isObject(json['components']) ? json['components'] : {}))
