@@ -6,7 +6,7 @@ TypeScript packages for reading content from Coho CMS.
 |---|---|
 | [`@coho-cms/delivery`](packages/delivery) | The delivery client, and the runtime generated content libraries call |
 | [`@coho-cms/codegen`](packages/codegen) | Generates a typed content library from your project's content types |
-| [`create-coho`](packages/create-coho) | `npm create coho@latest`: creates your content library from the template. In testing: run it from a checkout |
+| [`create-coho`](packages/create-coho) | `npm create coho`: creates your content library from the template |
 
 ## Development
 
@@ -26,11 +26,14 @@ npm run build
 
 ## Publishing
 
-The three packages are published to npm together, at one version, as alphas for now: `create-coho` pins every library it creates to that version of `@coho-cms/delivery` and `@coho-cms/codegen`, and carries the library template inside it.
+The three packages are published to npm together, at one version: `create-coho` pins every library it creates to that version of `@coho-cms/delivery` and `@coho-cms/codegen`, and carries the library template inside it.
 
-1. Bump all three versions to the same new one, such as `0.1.0-alpha.3`, and merge.
+1. Bump all three versions to the same new one, such as `0.1.1`, and merge.
 2. Tag [coho-template-typescript](https://github.com/coho-cms/coho-template-typescript) at the commit to ship.
-3. Run the **Publish** workflow, naming that tag. It tests, bundles the template into `create-coho`, and publishes all three under the `alpha` dist-tag.
+3. Run the **Publish** workflow, naming that tag and the dist-tag: `latest` for a release, or `alpha` for a prerelease such as `0.2.0-alpha.1`, which `latest` must never point at. It tests, bundles the template into `create-coho`, and publishes all three.
+4. Tag this repository at the release commit, such as `v0.1.1`.
+
+Versions follow semver within 0.x: a fix is a patch, `0.1.1`, and a change that breaks a generated library or the runtime's API is a minor, `0.2.0`, which `^0.1.0` does not take.
 
 A version cannot be published twice. The workflow needs `NPM_TOKEN`, an npm token that can publish `create-coho` and the `@coho-cms` scope without a one-time password.
 
