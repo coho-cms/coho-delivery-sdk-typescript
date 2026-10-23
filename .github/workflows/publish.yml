@@ -2,19 +2,18 @@ name: Publish
 
 # Publishes @coho-cms/delivery, @coho-cms/codegen and create-coho to npm, together and
 # at one version: create-coho pins the libraries it creates to that version, and
-# carries the library template, bundled from the ref named here. Bump all three
-# versions, merge, tag the template, then run this by hand. A version cannot be
-# published twice, so every fix is a new version.
+# carries the library template, bundled from coho-template-typescript at the same tag.
+# Pushing a release tag runs it: release-v2026.1.0 publishes 2026.1.0 under latest,
+# and release-v2026.2.0-alpha.1 publishes 2026.2.0-alpha.1 under alpha. Tag the
+# template first. A version cannot be published twice, so every fix is a new version.
+#
+# There is no npm token: each package names this repository and this workflow file
+# as its trusted publisher on npmjs.com, and npm trades the job's OIDC token for a
+# short-lived publish credential. Renaming this file breaks that until each
+# package's trusted publisher is updated to match.
 on:
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: The dist-tag to publish under. Prereleases need one other than latest.
-        required: true
-        default: alpha
-      template-ref:
-        description: The coho-template-typescript tag or branch to bundle into create-coho
-        required: true
+  push:
+    tags: ['release-v*']
 
 permissions:
   contents: read
@@ -22,28 +21,42 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v5
       - name: Check out the template to bundle
         uses: actions/checkout@v5
         with:
           repository: coho-cms/coho-template-typescript
-          ref: ${{ inputs.template-ref }}
+          ref: refs/tags/${{ github.ref_name }}
           path: template-checkout
       - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
-          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or later, newer than some Node 24 releases bundle.
+      - run: npm install -g npm@latest
       - run: npm ci
+      # The tag reaches the shell as a variable, never pasted into the script. A
+      # prerelease goes under its first identifier, alpha for 2026.2.0-alpha.1, so
+      # latest never points at one.
+      - name: Take the version and dist-tag from the release tag
+        run: |
+          version="${TAG#release-v}"
+          case "$version" in
+            *-*) pre="${version#*-}"; dist_tag="${pre%%.*}" ;;
+            *) dist_tag=latest ;;
+          esac
+          npm version "$version" --workspaces --no-git-tag-version --allow-same-version
+          echo "DIST_TAG=$dist_tag" >> "$GITHUB_ENV"
+        env:
+          TAG: ${{ github.ref_name }}
       - run: npm run build
       - run: npm run typecheck
       - run: npm test
       - name: Bundle the template into create-coho
         run: npm run bundle -w create-coho -- "$GITHUB_WORKSPACE/template-checkout"
-      # The tag reaches the shell as a variable, never pasted into the script.
       - name: Publish
-        run: npm publish --workspaces --tag "$TAG"
-        env:
-          TAG: ${{ inputs.tag }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --workspaces --tag "$DIST_TAG"
