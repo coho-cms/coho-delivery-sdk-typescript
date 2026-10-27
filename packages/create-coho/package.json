@@ -1,6 +1,6 @@
 {
   "name": "create-coho",
-  "version": "2026.1.0",
+  "version": "2026.2.0-alpha.1",
   "description": "Creates a content library for Coho CMS: a TypeScript package, generated from your content types, that your sites and services install.",
   "license": "Apache-2.0",
   "type": "module",
