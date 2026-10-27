@@ -81,8 +81,11 @@ export interface ImageOptions
     /** 1 to 100. The edge rounds to a multiple of 5; its default is 75. */
     readonly quality?: number;
 
-    /** The colour around a `pad`, as `rrggbb`. */
-    readonly background?: string;
+    // ⚠️ There is no `background`. A `pad` is filled, and a `jpg` flattened, with a
+    // colour the deployment sets rather than one a URL carries. It used to be `bg`
+    // here: six hex digits, so about seventeen million cache keys for one image and
+    // as many transforms, which anyone could walk. Adding it back means adding that
+    // back.
 }
 
 /**
@@ -175,14 +178,13 @@ export function downloadUrl(asset: Asset): string
 /** The query the edge resizes from, in a fixed order, so equal options make equal URLs. */
 function imageQuery(asset: Asset, options: ImageOptions): string
 {
-    const { width, height, fit, format, quality, background } = options;
+    const { width, height, fit, format, quality } = options;
     const params: [string, string | number | undefined][] = [
         ['w', width],
         ['h', height],
         ['fit', fit],
         ['fm', format],
         ['q', quality],
-        ['bg', background],
     ];
     // The edge cannot look the focal point up, so a crop is told where to centre.
     const focal = asset.focalPoint;
