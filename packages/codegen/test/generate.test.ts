@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { CodegenError, drift, generate, readTypeModel, write } from '../src/index.ts';
 import type { Field, Generated, TypeModel } from '../src/index.ts';
 import type { AnyPage, LandingPage, Page, ServicePage } from './expected/inheritance/index.ts';
+import type { Event, Talk } from './expected/lists/index.ts';
 import type { Article, Person, Page as TraitPage, Seo, SocialCard } from './expected/traits/index.ts';
 
 /**
@@ -13,7 +14,7 @@ import type { Article, Person, Page as TraitPage, Seo, SocialCard } from './expe
  * `npm run lint` holds to this repository's style. After an intended change, rewrite
  * them with `COHO_UPDATE_GOLDEN=1 npm test` and review the diff.
  */
-const FIXTURES = ['cli-next-blog', 'delivery-fixture', 'assets', 'repeaters', 'inheritance', 'traits'];
+const FIXTURES = ['cli-next-blog', 'delivery-fixture', 'assets', 'repeaters', 'inheritance', 'traits', 'lists'];
 
 function fixture(name: string): TypeModel
 {
@@ -155,6 +156,48 @@ test('a field kind this generator does not know is typed unknown, with a warning
 
     assert.match(file(generated, 'Post.ts'), /readonly shape\?: unknown;/);
     assert.match(generated.warnings[0] ?? '', /'polygon'/);
+});
+
+test('a list is an array of its item kind, optional by presence, and never a link', () =>
+{
+    const generated = generate(model({
+        event: [
+            { id: 'keywords', kind: 'list', item: 'text', localized: true, max: 10 },
+            { id: 'scores', kind: 'list', item: 'number' },
+            { id: 'sessions', kind: 'list', item: 'datetime', presence: 'always', required: true, min: 1 },
+            { id: 'seats', kind: 'list', item: 'integer', min: 2, max: 4 },
+        ],
+    }));
+    const event = file(generated, 'Event.ts');
+
+    assert.match(event, /^ {4}\/\*\* keywords\. At most 10 values\. The locale's own list, empty when it has none\. Absent where the locale has no translation\. \*\/\n {4}readonly keywords\?: readonly string\[\];$/m);
+    assert.match(event, /^ {4}readonly scores\?: readonly number\[\];$/m);
+    assert.match(event, /^ {4}\/\*\* sessions\. Each an ISO 8601 date and time\. At least 1 value\. \*\/\n {4}readonly sessions: readonly string\[\];$/m);
+    assert.match(event, /^ {4}\/\*\* seats\. 2 to 4 values\. \*\/$/m);
+    // Passed through as delivery sends it: no link, and only a required one is always there.
+    assert.match(file(generated, 'index.ts'), /^ {4}event: \{ always: \["sessions"\] \},$/m);
+    assert.deepEqual(generated.warnings, []);
+});
+
+test('a list in a component is typed as at the top level, and a localized one is optional', () =>
+{
+    const generated = generate(model(
+        { event: [{ id: 'agenda', kind: 'repeater', of: ['talk'] }] },
+        { components: components({ talk: [{ id: 'tracks', kind: 'list', item: 'integer', localized: true }, { id: 'speakers', kind: 'list', item: 'text', presence: 'always', required: true }] }) },
+    ));
+    const talk = file(generated, 'Talk.ts');
+
+    assert.match(talk, /^ {4}\/\*\* tracks\. The locale's own list, empty when it has none\. Absent where the locale has no translation\. \*\/\n {4}readonly tracks\?: readonly number\[\];$/m);
+    assert.match(talk, /^ {4}readonly speakers: readonly string\[\];$/m);
+    assert.match(file(generated, 'index.ts'), /^ {4}event: \{ items: \{ agenda: \["talk"\] \} \},$/m);
+});
+
+test('a list of an item kind this generator does not know holds unknown values, with a warning', () =>
+{
+    const generated = generate(model({ post: [{ id: 'spots', kind: 'list', item: 'point' }] }));
+
+    assert.match(file(generated, 'Post.ts'), /readonly spots\?: readonly unknown\[\];/);
+    assert.match(generated.warnings[0] ?? '', /post\.spots is a list of 'point'/);
 });
 
 test('a link whose target type is not on the ref is an untyped entry', () =>
@@ -337,4 +380,19 @@ export function aTraitByTheTypes(article: Article, page: TraitPage, person: Pers
     // @ts-expect-error: a person does not have the SEO trait
     const notSeo: Seo = person as Person & { metaTitle: number };
     void notSeo;
+}
+
+/** Compiled by `npm run typecheck`, never called: the lists fixture's lists hold their item kind, and an empty one is a value. */
+export function aListByTheTypes(event: Event, talk: Talk): void
+{
+    const keywords: readonly string[] = event.keywords ?? [];
+    const sessions: readonly string[] = event.sessions;
+    const tracks: readonly number[] = talk.tracks ?? [];
+    const none: Event['keywords'] = [];
+    void [keywords, sessions, tracks, none];
+    // @ts-expect-error: a list of text holds no numbers
+    const numbers: Event['keywords'] = [1];
+    void numbers;
+    // @ts-expect-error: a list is read only
+    event.sessions.push('2026-01-01T00:00:00Z');
 }

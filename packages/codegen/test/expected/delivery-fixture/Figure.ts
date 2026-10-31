@@ -2,6 +2,7 @@
 
 import type * as runtime from "@coho-cms/delivery";
 import type { Citation } from "./Citation.ts";
+import type { Step } from "./Step.ts";
 
 /** Figure */
 export interface Figure extends runtime.EntryBase<"figure">
@@ -20,4 +21,13 @@ export interface Figure extends runtime.EntryBase<"figure">
 
     /** sources */
     readonly sources?: readonly Citation[];
+
+    /** steps */
+    readonly steps?: readonly Step[];
+
+    /** keywords. The locale's own list, empty when it has none. Absent where the locale has no translation. */
+    readonly keywords?: readonly string[];
+
+    /** sizes. At most 5 values. */
+    readonly sizes?: readonly number[];
 }

@@ -401,6 +401,17 @@ function fieldType(type: ContentType, field: Field, family: Families, warnings: 
             const asset = imageOnly(field) ? 'runtime.ImageAsset' : 'runtime.Asset';
             return field.many ? `readonly ${asset}[]` : `${asset} | null`;
         }
+        case 'list': {
+            // Since type model 1.5: plain values, never links, so the runtime passes it
+            // through as delivery sent it. A localized one is the locale's array.
+            const item = listItem(field);
+            if (item === undefined)
+            {
+                warnings.push(`${type.slug}.${field.id} is a list of '${String(field.item)}', which this generator does not know; its values are typed unknown. Upgrade @coho-cms/codegen.`);
+                return 'readonly unknown[]';
+            }
+            return `readonly ${item}[]`;
+        }
         case 'repeater': {
             // A union on `_type` of the components on the ref. The runtime leaves out
             // an item of any other component (`shape`'s `items`), so the union is never
@@ -426,6 +437,22 @@ function choices(field: Field): string
     return [...(field.values ?? []).map((value) => JSON.stringify(value)), '(string & {})'].join(' | ');
 }
 
+/** The TypeScript type of each of a list's values, or undefined for an item kind this generator does not know. */
+function listItem(field: Field): string | undefined
+{
+    switch (field.item)
+    {
+        case 'text':
+        case 'datetime':
+            return 'string';
+        case 'integer':
+        case 'number':
+            return 'number';
+        default:
+            return undefined;
+    }
+}
+
 /** A repeater that names no component on the ref, whose items are typed as {@link repeaterFile}'s. */
 function untypedRepeater(field: Field): boolean
 {
@@ -448,8 +475,23 @@ function note(field: Field): string
     if (field.kind === 'longText' && field.textFormat === 'markdown') notes.push('Markdown.');
     if (field.kind === 'longText' && field.textFormat === 'html') notes.push('HTML.');
     if (field.kind === 'datetime') notes.push('An ISO 8601 date and time.');
+    if (field.kind === 'list')
+    {
+        if (field.item === 'datetime') notes.push('Each an ISO 8601 date and time.');
+        if (field.min !== undefined || field.max !== undefined) notes.push(`${counted(field.min, field.max)}.`);
+        // An empty list is a value: the locale has none, where an untranslated one leaves the field out.
+        if (field.localized) notes.push('The locale\'s own list, empty when it has none.');
+    }
     if (field.localized) notes.push('Absent where the locale has no translation.');
     return notes.join(' ');
+}
+
+/** How many values a list holds: `At least 1 value`, `At most 5 values`, or `1 to 5 values`. */
+function counted(min: number | undefined, max: number | undefined): string
+{
+    const values = (count: number): string => `${count} value${count === 1 ? '' : 's'}`;
+    if (min !== undefined && max !== undefined) return min === max ? `Exactly ${values(min)}` : `${min} to ${values(max)}`;
+    return min !== undefined ? `At least ${values(min)}` : `At most ${values(max ?? 0)}`;
 }
 
 /** A one-line doc comment. Names are content, so a comment's end inside one is broken up. */
@@ -466,6 +508,7 @@ function shapeOf(types: readonly ContentType[], family: Families): string[]
     const lines = [doc, 'export const shape: runtime.Shape = {'];
     for (const type of types)
     {
+        // A list (type model 1.5) holds plain values, so it is neither a link nor items.
         const links = type.fields
             .filter((field) => field.kind === 'reference')
             .map((field) => `${field.id}: ${JSON.stringify(field.many ? 'many' : 'one')}`);

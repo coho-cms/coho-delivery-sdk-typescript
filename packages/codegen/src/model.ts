@@ -77,7 +77,12 @@ export interface Field
     readonly required: boolean;
     readonly localized: boolean;
     readonly sortable: boolean;
+
+    /** On references and assets: an array of them. A list of plain values is a `list`, never `many`. */
     readonly many?: boolean;
+
+    /** Since 1.5, on a `list`: the kind of each of its values, `text`, `integer`, `number`, or `datetime`. Open, as `kind` is. */
+    readonly item?: string;
 
     /** On assets (IR 1.1): the media types a linked file may be, or family wildcards. Empty for any. */
     readonly accept?: readonly string[];
@@ -94,7 +99,10 @@ export interface Field
     /** Since 1.4: the trait the field comes from, a key of `traits`. As this type has it, which may be tighter than the trait's. */
     readonly trait?: string;
 
+    /** A lower bound on the value; on a `list` (1.5), on how many values it holds. */
     readonly min?: number;
+
+    /** An upper bound on the value; on a `list` (1.5), on how many values it holds. */
     readonly max?: number;
 }
 

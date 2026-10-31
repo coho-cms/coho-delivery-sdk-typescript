@@ -52,6 +52,21 @@ test('the untyped reads return any type, narrowed by _type', async () =>
     if (entry?._type === 'article') assert.equal(entry.rank, 101);
 });
 
+test('a read in another locale projects item fields and keeps an empty list, through the generated types', async () =>
+{
+    const figure = await coho('de-DE').figure.byId('00000000-0000-7000-8000-0000000000f3');
+
+    assert.equal(figure?._type, 'figure');
+    // A localized label in each step: German in the first, none in the second.
+    assert.deepEqual(figure?.steps?.map((step) => step.label), ['Messen', undefined]);
+    assert.deepEqual(figure?.steps?.map((step) => step.minutes), [5, 2]);
+    // A list of text, empty in German on purpose, and a list of integers.
+    const keywords: readonly string[] | undefined = figure?.keywords;
+    const sizes: readonly number[] | undefined = figure?.sizes;
+    assert.deepEqual(keywords, []);
+    assert.deepEqual(sizes, [3, 5]);
+});
+
 test('the module names the type model it was generated from', () =>
 {
     assert.equal(source.ref, 'v0.0.1');
@@ -65,4 +80,6 @@ export function refusedByTheTypes(client: ReturnType<typeof coho>): void
     void client.article.list({ order: 'title' });
     // @ts-expect-error: a notice has no rank
     void client.notice.list({ order: 'rank' });
+    // @ts-expect-error: a list is never sortable
+    void client.figure.list({ order: 'sizes' });
 }
