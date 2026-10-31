@@ -1,6 +1,6 @@
 {
   "name": "@coho-cms/delivery",
-  "version": "2026.2.0-alpha.2",
+  "version": "2026.2.0-alpha.3",
   "description": "The Coho CMS delivery client, and the runtime that generated content libraries call.",
   "license": "Apache-2.0",
   "type": "module",
