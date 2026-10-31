@@ -6,6 +6,7 @@ import { CodegenError, drift, generate, readTypeModel, write } from '../src/inde
 import type { Field, Generated, TypeModel } from '../src/index.ts';
 import type { AnyPage, LandingPage, Page, ServicePage } from './expected/inheritance/index.ts';
 import type { Event, Talk } from './expected/lists/index.ts';
+import type { MenuItem, SiteNavigation } from './expected/nested/index.ts';
 import type { Article, Person, Page as TraitPage, Seo, SocialCard } from './expected/traits/index.ts';
 
 /**
@@ -14,7 +15,7 @@ import type { Article, Person, Page as TraitPage, Seo, SocialCard } from './expe
  * `npm run lint` holds to this repository's style. After an intended change, rewrite
  * them with `COHO_UPDATE_GOLDEN=1 npm test` and review the diff.
  */
-const FIXTURES = ['cli-next-blog', 'delivery-fixture', 'assets', 'repeaters', 'inheritance', 'traits', 'lists'];
+const FIXTURES = ['cli-next-blog', 'delivery-fixture', 'assets', 'repeaters', 'inheritance', 'traits', 'lists', 'nested'];
 
 function fixture(name: string): TypeModel
 {
@@ -238,6 +239,56 @@ test('a component type is an item interface of its own, and a repeater holds a u
     assert.match(index, /^ {4}page: \{ items: \{ blocks: \["hero", "quote"\], refs: \["quote"\] \} \},$/m);
 });
 
+test('a component that holds itself, or holds one that holds it, is a recursive type, and its repeaters are in the shape', () =>
+{
+    const generated = generate(model(
+        { menu: [{ id: 'items', kind: 'repeater', of: ['menuItem'] }], grid: [{ id: 'rows', kind: 'repeater', of: ['row'] }] },
+        {
+            components: extending({ megaMenuItem: 'menuItem' }, ['panel'], components({
+                menuItem: [{ id: 'label' }, { id: 'children', kind: 'repeater', of: ['menuItem'] }],
+                megaMenuItem: [{ id: 'label' }, { id: 'children', kind: 'repeater', of: ['menuItem'] }, { id: 'promo' }],
+                row: [{ id: 'columns', kind: 'repeater', of: ['column'] }],
+                column: [{ id: 'rows', kind: 'repeater', of: ['row'] }, { id: 'text' }],
+                panel: [{ id: 'rows', kind: 'repeater', of: ['row'] }],
+            })),
+        },
+    ));
+
+    // A base component holds its family, from its own file, so it imports nothing of its own.
+    const menuItem = file(generated, 'MenuItem.ts');
+    assert.match(menuItem, /readonly children\?: readonly AnyMenuItem\[\];/);
+    assert.match(menuItem, /^import type \{ MegaMenuItem \} from "\.\/MegaMenuItem\.ts";$/m);
+    assert.doesNotMatch(menuItem, /from "\.\/MenuItem\.ts"/);
+    assert.match(file(generated, 'MegaMenuItem.ts'), /^import type \{ AnyMenuItem \} from "\.\/MenuItem\.ts";$/m);
+    // Two components that hold each other import each other, as type-only imports may.
+    assert.match(file(generated, 'Row.ts'), /^import type \{ Column \} from "\.\/Column\.ts";$/m);
+    assert.match(file(generated, 'Column.ts'), /^import type \{ Row \} from "\.\/Row\.ts";$/m);
+    assert.match(file(generated, 'Column.ts'), /readonly rows\?: readonly Row\[\];/);
+
+    const index = file(generated, 'index.ts');
+    // Each component once, by slug, after the content types: no item is of an abstract one.
+    assert.ok(index.includes([
+        'export const shape: runtime.Shape = {',
+        '    grid: { items: { rows: ["row"] } },',
+        '    menu: { items: { items: ["megaMenuItem", "menuItem"] } },',
+        '    column: { items: { rows: ["row"] } },',
+        '    megaMenuItem: { items: { children: ["megaMenuItem", "menuItem"] } },',
+        '    menuItem: { items: { children: ["megaMenuItem", "menuItem"] } },',
+        '    row: { items: { columns: ["column"] } },',
+        '};',
+    ].join('\n')), index);
+    assert.doesNotMatch(index, /^ {4}panel:/m);
+    assert.deepEqual(generated.warnings, []);
+});
+
+test('a component that holds no typed repeater is not in the shape, and no shape at all is empty', () =>
+{
+    const generated = generate(model({}, { components: components({ menuItem: [{ id: 'children', kind: 'repeater', of: [] }], card: [{ id: 'title' }] }) }));
+
+    assert.match(file(generated, 'index.ts'), /^export const shape: runtime\.Shape = \{\};$/m);
+    assert.match(file(generated, 'MenuItem.ts'), /readonly children\?: readonly RepeaterItem\[\];/);
+});
+
 test('a component cannot share a name with a content type', () =>
 {
     assert.throws(
@@ -395,4 +446,16 @@ export function aListByTheTypes(event: Event, talk: Talk): void
     void numbers;
     // @ts-expect-error: a list is read only
     event.sessions.push('2026-01-01T00:00:00Z');
+}
+
+/** Compiled by `npm run typecheck`, never called: the nested fixture's items hold items, as deep as content goes. */
+export function aNestedMenuByTheTypes(navigation: SiteNavigation): void
+{
+    const deep: string | undefined = navigation.footerLinks?.[0]?.children?.[0]?.children?.[0]?.label;
+    const item: MenuItem | undefined = navigation.footerLinks?.[0]?.children?.[0];
+    const top: string | undefined = navigation.topNavigation?.[0]?.children?.[0]?.label;
+    void [deep, item, top];
+    // @ts-expect-error: a menu item's children are menu items, not locale menu items
+    const other: MenuItem['_type'] | undefined = navigation.topNavigation?.[0]?.children?.[0]?._type;
+    void other;
 }

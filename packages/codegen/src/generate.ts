@@ -126,7 +126,7 @@ function indexFile(
         '/** Any content type on this ref. Switch on `_type` to narrow it. */',
         `export type AnyEntry = ${concrete.length === 0 ? 'never' : concrete.map((type) => nameOf(type.slug)).join(' | ')};`,
         '',
-        ...shapeOf(concrete, family),
+        ...shapeOf(concrete, components, family),
         '',
         ...sourceOf(model),
         '',
@@ -150,7 +150,8 @@ function typeFile(
 ): GeneratedFile
 {
     const name = nameOf(type.slug);
-    // Each name this file uses, by the file it is in.
+    // Each name this file uses, by the file it is in. Not its own, which a type that
+    // links to itself, or a component that holds itself (type model 1.6), names.
     const linked = new Map<string, Set<string>>();
     const use = (other: string, file: string): void =>
     {
@@ -415,7 +416,8 @@ function fieldType(type: ContentType, field: Field, family: Families, warnings: 
         case 'repeater': {
             // A union on `_type` of the components on the ref. The runtime leaves out
             // an item of any other component (`shape`'s `items`), so the union is never
-            // wrong about what it holds.
+            // wrong about what it holds. Since type model 1.6 a component's repeater is
+            // typed the same way, and one that holds itself is a recursive type.
             const components = field.of ?? [];
             if (components.length === 0) return 'readonly RepeaterItem[]';
             const kinds = [...new Set(components.map(family.target))];
@@ -457,6 +459,12 @@ function listItem(field: Field): string | undefined
 function untypedRepeater(field: Field): boolean
 {
     return field.kind === 'repeater' && (field.of ?? []).length === 0;
+}
+
+/** A repeater that names components on the ref, whose items the runtime keeps only if it lists them. */
+function typedRepeater(field: Field): boolean
+{
+    return field.kind === 'repeater' && !untypedRepeater(field);
 }
 
 /** Whether every file the field accepts is a raster image, which always has dimensions. */
@@ -501,10 +509,18 @@ function doc(name: string, note: string): string
     return `/** ${text} */`;
 }
 
-function shapeOf(types: readonly ContentType[], family: Families): string[]
+/**
+ * The runtime's shape: each concrete content type's links, the fields it always has,
+ * and the components each repeater holds, then, since type model 1.6, the components
+ * each component's repeaters hold, so items are filtered at every level. A component
+ * may hold itself, so each is listed once, by slug, and never walked.
+ */
+function shapeOf(types: readonly ContentType[], components: readonly ContentType[], family: Families): string[]
 {
-    const doc = '/** What the runtime needs to hydrate each type: its links, the fields it always has, and the components each repeater holds. */';
-    if (types.length === 0) return [doc, 'export const shape: runtime.Shape = {};'];
+    const doc = '/** What the runtime needs to hydrate each type, and each component with repeaters: its links, the fields it always has, and the components each repeater holds. */';
+    // An item is always of a concrete component, and only its repeaters are checked.
+    const holders = components.filter((component) => component.abstract !== true && component.fields.some(typedRepeater));
+    if (types.length === 0 && holders.length === 0) return [doc, 'export const shape: runtime.Shape = {};'];
     const lines = [doc, 'export const shape: runtime.Shape = {'];
     for (const type of types)
     {
@@ -513,11 +529,7 @@ function shapeOf(types: readonly ContentType[], family: Families): string[]
             .filter((field) => field.kind === 'reference')
             .map((field) => `${field.id}: ${JSON.stringify(field.many ? 'many' : 'one')}`);
         const always = type.fields.filter((field) => field.presence === 'always').map((field) => JSON.stringify(field.id));
-        const items = type.fields
-            .filter((field) => field.kind === 'repeater' && !untypedRepeater(field))
-            // The concrete components: the runtime keeps an item only if its `_type` is listed,
-            // and an item of a base component is always one of its family (type model 1.3).
-            .map((field) => `${field.id}: [${[...new Set((field.of ?? []).flatMap((slug) => (family.has(slug) ? family.members(slug) : [slug])))].map((slug) => JSON.stringify(slug)).join(', ')}]`);
+        const items = itemsOf(type, family);
 
         const parts: string[] = [];
         if (links.length > 0) parts.push(`links: { ${links.join(', ')} }`);
@@ -525,8 +537,20 @@ function shapeOf(types: readonly ContentType[], family: Families): string[]
         if (items.length > 0) parts.push(`items: { ${items.join(', ')} }`);
         lines.push(`${INDENT}${type.slug}: {${parts.length === 0 ? '' : ` ${parts.join(', ')} `}},`);
     }
+    // Nothing about an item is checked but the items it holds.
+    for (const component of holders) lines.push(`${INDENT}${component.slug}: { items: { ${itemsOf(component, family).join(', ')} } },`);
     lines.push('};');
     return lines;
+}
+
+/** Each typed repeater's entry in `items`: the field id and the concrete components it holds. */
+function itemsOf(type: ContentType, family: Families): string[]
+{
+    return type.fields
+        .filter(typedRepeater)
+        // The concrete components: the runtime keeps an item only if its `_type` is listed,
+        // and an item of a base component is always one of its family (type model 1.3).
+        .map((field) => `${field.id}: [${[...new Set((field.of ?? []).flatMap((slug) => (family.has(slug) ? family.members(slug) : [slug])))].map((slug) => JSON.stringify(slug)).join(', ')}]`);
 }
 
 function sourceOf(model: TypeModel): string[]

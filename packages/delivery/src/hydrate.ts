@@ -4,9 +4,9 @@ import type { Entry, EntryGraph } from './types.ts';
 export type LinkKind = 'one' | 'many';
 
 /**
- * What hydration needs to know about one content type. Generated code writes it
- * from the type model. Untyped callers may write one by hand, or pass none, in
- * which case references stay ids.
+ * What hydration needs to know about one content type, or about one component type
+ * whose fields hold repeaters. Generated code writes it from the type model. Untyped
+ * callers may write one by hand, or pass none, in which case references stay ids.
  */
 export interface TypeShape
 {
@@ -20,11 +20,13 @@ export interface TypeShape
      * The repeater fields, by field id, each with the component types its generated
      * code knows. An item of any other component is left out, and reported, so code
      * generated before a component was added never meets an item it has no type for.
+     * Since type model 1.6 a component's repeaters are here too, under its slug, and
+     * items are filtered at every level.
      */
     readonly items?: Readonly<Record<string, readonly string[]>>;
 }
 
-/** Type shapes, by content type slug. */
+/** Type shapes, by content or component type slug, which share one namespace. */
 export type Shape = Readonly<Record<string, TypeShape>>;
 
 /**
@@ -83,7 +85,8 @@ export interface Issue
      * or the other way round. `unlisted-link`: a link delivery neither resolved nor
      * reported, which means the shape and the content disagree about the field.
      * `unknown-item`: a repeater item of a component the shape does not list, left
-     * out; the code was generated before that component was added to the field.
+     * out; the code was generated before that component was added to the field. For
+     * an item inside an item, `field` is its path in the entry, `sections/0/cards`.
      */
     readonly kind: 'missing-field' | 'unexpected-value' | 'unlisted-link' | 'unknown-item';
 
@@ -121,6 +124,31 @@ export function hydrate(graph: EntryGraph, shape: Shape = {}, options: HydrateOp
         onIssue({ kind, id: entry.id, slug: entry.slug, type: entry.type, field, message: `${entry.type} '${entry.slug}' ${what}` });
     };
 
+    /**
+     * A repeater's items of the components it lists, each with its own repeaters'
+     * items kept the same way. The recursion follows the data, which delivery nests
+     * 5 deep at most, never the shape, where a component may hold itself.
+     */
+    const items = (entry: Entry, path: string, components: readonly string[], value: readonly unknown[]): unknown[] =>
+        value.flatMap((item: unknown, index) =>
+        {
+            const component = (item as { _type?: unknown } | null)?._type;
+            if (typeof component !== 'string' || !components.includes(component))
+            {
+                report('unknown-item', entry, path, `has an item of '${String(component)}' in '${path}', which this code has no type for; it is left out`);
+                return [];
+            }
+            const nested = shape[component]?.items;
+            if (nested === undefined) return [item];
+            const out: Record<string, unknown> = {};
+            for (const [field, inner] of Object.entries(item as Record<string, unknown>))
+            {
+                const held = nested[field];
+                out[field] = held !== undefined && Array.isArray(inner) ? items(entry, `${path}/${index}/${field}`, held, inner) : inner;
+            }
+            return [out];
+        });
+
     return graph.roots.flatMap((rootId) =>
     {
         const root = graph.entries[rootId];
@@ -157,16 +185,7 @@ export function hydrate(graph: EntryGraph, shape: Shape = {}, options: HydrateOp
             {
                 const kind = type?.links?.[field];
                 const components = type?.items?.[field];
-                if (components !== undefined && Array.isArray(value))
-                {
-                    out[field] = value.filter((item: unknown) =>
-                    {
-                        const component = (item as { _type?: unknown } | null)?._type;
-                        if (typeof component === 'string' && components.includes(component)) return true;
-                        report('unknown-item', entry, field, `has an item of '${String(component)}' in '${field}', which this code has no type for; it is left out`);
-                        return false;
-                    });
-                }
+                if (components !== undefined && Array.isArray(value)) out[field] = items(entry, field, components, value);
                 else if (kind === undefined || value === null) out[field] = value;
                 else if (kind === 'many' && Array.isArray(value)) out[field] = value.map((id) => follow(entry, field, id));
                 else if (kind === 'one' && !Array.isArray(value)) out[field] = follow(entry, field, value);
