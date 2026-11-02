@@ -120,6 +120,50 @@ The asset shape is the asset API's (`url`, `imageUrl`, `file`, `focalPoint`, `al
 
 Each client keeps a private cache of responses, following `Cache-Control` and `ETag`. A tag named directly is fetched once. An environment is reused for its short `max-age`, then revalidated, which costs a `304` when nothing was promoted. A preview is fetched every time. Pass `cache: false` to turn it off.
 
+## Receiving webhooks
+
+Coho signs each webhook request the way [Standard Webhooks](https://www.standardwebhooks.com) does. `verifyWebhook` checks the signature and the timestamp and answers the event. It has an entry point of its own, `@coho-cms/delivery/webhooks`, because it uses Node's `crypto`, which the rest of the package, running in browsers too, does not.
+
+**Verify the body exactly as it arrived.** A body parsed and serialized again is not the one that was signed, and is refused, so read it raw: `request.text()` in a Next.js route handler, or `express.raw()` in Express, never `express.json()`.
+
+```ts
+// app/api/coho/route.ts
+import { revalidateTag } from 'next/cache';
+import { CohoWebhookError, verifyWebhook } from '@coho-cms/delivery/webhooks';
+
+export async function POST(request: Request)
+{
+  const body = await request.text();
+  try
+  {
+    const event = verifyWebhook(body, request.headers, process.env.COHO_WEBHOOK_SECRET!);
+    if (event.type === 'environment.promoted') revalidateTag('coho');
+    return new Response(null, { status: 204 });
+  }
+  catch (error)
+  {
+    if (error instanceof CohoWebhookError) return new Response(error.reason, { status: 400 });
+    throw error;
+  }
+}
+```
+
+```ts
+// Express: the raw body, as a Buffer, for this route alone.
+app.post('/hooks/coho', express.raw({ type: 'application/json' }), (req, res) =>
+{
+  const event = verifyWebhook(req.body, req.headers, process.env.COHO_WEBHOOK_SECRET!);
+  // …
+  res.sendStatus(204);
+});
+```
+
+- **A refusal throws `CohoWebhookError`**, whose `reason` is `signature`, `timestamp`, or `headers`. Answer it `400`.
+- **The timestamp must be within five minutes** of the receiver's clock, before or after, so a captured request cannot be replayed. `toleranceSeconds` changes the window, and `now` sets the clock, for tests.
+- **While a secret is rotated, pass both**, `[current, previous]`. For 24 hours each request carries two signatures, one from each, and either is accepted.
+- **Header names match whatever their case**, from a Fetch `Headers` or a plain object such as Node's `req.headers`.
+- **The event is as Coho sent it**: `id`, `type`, `created_at`, `project`, `actor`, and `data`. Its `id` is the `webhook-id` header too, the same on every attempt, so drop an event already handled; events can arrive twice, and out of order. `data` holds identifiers and counts, never content: read the content itself through delivery.
+
 ## Errors
 
 A refusal throws `CohoDeliveryError`. Branch on its `code`: `REF_NOT_FOUND`, `KEY_REQUIRED`, `PROJECT_NOT_FOUND`, `INVALID_QUERY` or `RESOLUTION_LIMIT` for the request; `ARTIFACT_UNREADABLE` or `POOL_UNAVAILABLE` for the server; or `UNEXPECTED_RESPONSE` for an answer that isn't a problem document. A preview adds `UNAUTHENTICATED`, for a token that has expired or been revoked, and `ACCOUNT_SUSPENDED`, `ACCOUNT_CLOSED` and `USER_SUSPENDED`. A missing entry is `null`, not an error.
