@@ -3,7 +3,7 @@ export type { Asset, AssetFile, ImageAsset, ImageOptions, SrcsetOptions } from '
 export { createDeliveryClient } from './client.ts';
 export type { ClientOptions, DeliveryClient, DeliveryConfig, ListOptions, MountedConfig, PreviewConfig, ReadOptions, ReleasedConfig } from './client.ts';
 export { createContentClient } from './content.ts';
-export type { ContentClient, ContentConfig, ContentOptions, Page, TypeListOptions, TypeReader } from './content.ts';
+export type { ContentClient, ContentConfig, ContentOptions, Page, SingletonReader, TypeListOptions, TypeReader } from './content.ts';
 export { configFromEnv } from './env.ts';
 export type { Env } from './env.ts';
 export { CohoDeliveryError } from './errors.ts';

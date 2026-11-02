@@ -51,6 +51,16 @@ export interface TypeReader<T = HydratedEntry, O extends string = string>
 }
 
 /**
+ * The read of a singleton type (type model 1.7): a type with one entry on a ref, which
+ * answers to a fixed slug. Hydrated as `T`.
+ */
+export interface SingletonReader<T = HydratedEntry>
+{
+    /** Its entry, or null before the entry is first written on the ref. */
+    get(options?: ReadOptions): Promise<T | null>;
+}
+
+/**
  * Hydrated reads on one ref. What generated code builds its typed client from, so
  * that the logic lives in this package and reaches every library with an update.
  */
@@ -75,6 +85,12 @@ export interface ContentClient<Any = HydratedEntry>
      * `family`, the types an entry read here can be; without it, only `slug`'s own.
      */
     type<T = HydratedEntry, O extends string = string>(slug: string, family?: readonly string[]): TypeReader<T, O>;
+
+    /**
+     * The read of a singleton type, whose one entry answers to `entrySlug`. Generated code
+     * passes the type model's `entrySlug`, so the slug rule lives in one place, the server.
+     */
+    singleton<T = HydratedEntry>(slug: string, entrySlug: string): SingletonReader<T>;
 }
 
 export function createContentClient<Any = HydratedEntry>(config: ContentConfig, shape: Shape = {}): ContentClient<Any>
@@ -123,5 +139,14 @@ export function createContentClient<Any = HydratedEntry>(config: ContentConfig, 
                 },
             };
         },
+
+        // Its entry is read by its slug, as any other is: delivery has no route of its own for it.
+        singleton: <T = HydratedEntry>(slug: string, entrySlug: string): SingletonReader<T> => ({
+            get: async (asked) =>
+            {
+                const entry = first(await delivery.entryBySlug(config.ref, entrySlug, options(asked)));
+                return entry !== null && entry._type === slug ? (entry as T) : null;
+            },
+        }),
     };
 }

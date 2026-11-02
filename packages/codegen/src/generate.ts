@@ -188,6 +188,7 @@ function typeFile(
             kind === 'component' ? 'A repeater item, stored in the entry that holds it.' : '',
             type.extends !== undefined && names.has(type.extends) ? `Extends ${nameOf(type.extends)}, and has every field it has.` : '',
             type.abstract === true ? `Abstract: ${kind === 'component' ? 'an item' : 'an entry'} is one of the types that extend it.` : '',
+            singleton(type) ? `A singleton: its one entry answers to ${JSON.stringify(type.entrySlug)}.` : '',
             traits.length > 0 ? `Has the trait${traits.length === 1 ? '' : 's'} ${listed(traits)}.` : '',
         ].filter((part) => part !== '').join(' ')),
         `export interface ${name} extends ${[`runtime.${base}<${discriminant}>`, ...traits].join(', ')}`,
@@ -455,6 +456,12 @@ function listItem(field: Field): string | undefined
     }
 }
 
+/** A singleton (type model 1.7) with the slug its entry answers to, read by one getter. */
+function singleton(type: ContentType): type is ContentType & { readonly entrySlug: string }
+{
+    return type.singleton === true && typeof type.entrySlug === 'string' && type.entrySlug !== '';
+}
+
 /** A repeater that names no component on the ref, whose items are typed as {@link repeaterFile}'s. */
 function untypedRepeater(field: Field): boolean
 {
@@ -580,6 +587,10 @@ function client(types: readonly ContentType[], nameOf: (slug: string) => string,
         }
         if (members.has(member)) throw new CodegenError(`Two types would both be read as coho.${member}; rename one of them`);
         members.add(member);
+        if (type.singleton === true && !singleton(type))
+        {
+            warnings.push(`Type '${type.slug}' is a singleton with no entrySlug, so it is read as an ordinary type. Pull the type model again.`);
+        }
         const sortable = type.fields.filter((field) => field.sortable).map((field) => JSON.stringify(field.id));
         // A type's read lists its descendants too (type model 1.3), so it reads its family.
         const generic = `${family.target(type.slug)}, ${sortable.length === 0 ? 'never' : sortable.join(' | ')}`;
@@ -590,8 +601,17 @@ function client(types: readonly ContentType[], nameOf: (slug: string) => string,
     // Every member is documented, so each is its own paragraph.
     for (const { type, member, generic } of readers)
     {
-        lines.push(`${INDENT}${doc(type.name, '')}`);
-        lines.push(`${INDENT}readonly ${member}: runtime.TypeReader<${generic}>;`);
+        // A singleton (type model 1.7) has one entry, so one getter in place of a list and a read by slug.
+        if (singleton(type))
+        {
+            lines.push(`${INDENT}${doc(type.name, 'A singleton: `get()` reads its one entry, null before it is first written.')}`);
+            lines.push(`${INDENT}readonly ${member}: runtime.SingletonReader<${nameOf(type.slug)}>;`);
+        }
+        else
+        {
+            lines.push(`${INDENT}${doc(type.name, '')}`);
+            lines.push(`${INDENT}readonly ${member}: runtime.TypeReader<${generic}>;`);
+        }
         lines.push('');
     }
     lines.push(
@@ -613,6 +633,11 @@ function client(types: readonly ContentType[], nameOf: (slug: string) => string,
     );
     for (const { type, member, generic } of readers)
     {
+        if (singleton(type))
+        {
+            lines.push(`${INDENT}${INDENT}${member}: content.singleton<${nameOf(type.slug)}>(${JSON.stringify(type.slug)}, ${JSON.stringify(type.entrySlug)}),`);
+            continue;
+        }
         // A typed read of one entry checks its `_type`, which for a base type is any in its family.
         const kinds = family.has(type.slug) ? `, [${family.members(type.slug).map((slug) => JSON.stringify(slug)).join(', ')}]` : '';
         lines.push(`${INDENT}${INDENT}${member}: content.type<${generic}>(${JSON.stringify(type.slug)}${kinds}),`);

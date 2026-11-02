@@ -52,6 +52,19 @@ test('a slug of another type is null, the same as no entry', async () =>
     assert.equal(await bare.client.type('article').bySlug('nope'), null);
 });
 
+test('a singleton reads its one entry by its fixed slug, and is null when that slug is another type\'s or no one\'s', async () =>
+{
+    // The recordings have no singleton, so `chain-1` stands in for an entry slug.
+    const { client, calls } = content();
+    const settings = await client.singleton<Article>('article', 'chain-1').get({ depth: 2 });
+    assert.equal(settings?.title, 'Chain 1');
+    assert.match(calls[0]?.url ?? '', /\/entries-by-slug\/chain-1\?/);
+
+    assert.equal(await client.singleton('notice', 'chain-1').get({ depth: 2 }), null);
+    const bare = content({ locale: undefined });
+    assert.equal(await bare.client.singleton('article', 'nope').get(), null);
+});
+
 test('a read of a base type finds an entry of any type in its family', async () =>
 {
     const { client } = content();

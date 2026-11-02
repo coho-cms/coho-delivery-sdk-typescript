@@ -47,6 +47,7 @@ if (post?.author && isResolved(post.author)) console.log(post.author.fullName);
 
 - **Entries are plain data**, with their fields beside the system keys `_id`, `_type`, `_slug` and `_locale`. A field id cannot start with `_`, so the two never collide. Results survive `JSON.stringify` and a server-to-client component boundary.
 - **A reference that is not resolved is a stub**, `{ _id, _unresolved }`: `depth` when it is beyond the requested depth, `absent` when it is not on the ref, and `cycle` where following it would loop back.
+- **A singleton is read with `get()`.** `content.singleton<SiteSettings>('siteSettings', 'site-settings').get()` reads a type that has one entry on a ref, by the slug its entry answers to, and is null before that entry is first written. Generated code passes the type model's `entrySlug`.
 - **Problems are reported, not thrown.** An entry missing a field its type always has, which happens to older entries after a field becomes required, is passed to `onIssue`, once per entry and field. The default is `console.warn`.
 
 ## Released and unreleased content

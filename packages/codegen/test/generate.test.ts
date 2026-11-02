@@ -7,6 +7,7 @@ import type { Field, Generated, TypeModel } from '../src/index.ts';
 import type { AnyPage, LandingPage, Page, ServicePage } from './expected/inheritance/index.ts';
 import type { Event, Talk } from './expected/lists/index.ts';
 import type { MenuItem, SiteNavigation } from './expected/nested/index.ts';
+import type { Coho as Singletons, HomePage, SiteSettings } from './expected/singletons/index.ts';
 import type { Article, Person, Page as TraitPage, Seo, SocialCard } from './expected/traits/index.ts';
 
 /**
@@ -15,7 +16,7 @@ import type { Article, Person, Page as TraitPage, Seo, SocialCard } from './expe
  * `npm run lint` holds to this repository's style. After an intended change, rewrite
  * them with `COHO_UPDATE_GOLDEN=1 npm test` and review the diff.
  */
-const FIXTURES = ['cli-next-blog', 'delivery-fixture', 'assets', 'repeaters', 'inheritance', 'traits', 'lists', 'nested'];
+const FIXTURES = ['cli-next-blog', 'delivery-fixture', 'assets', 'repeaters', 'inheritance', 'traits', 'lists', 'nested', 'singletons'];
 
 function fixture(name: string): TypeModel
 {
@@ -407,6 +408,26 @@ export function aHierarchyByTheTypes(landing: LandingPage, service: ServicePage,
     void own;
 }
 
+test('a singleton is read by one getter, at the slug the type model names', () =>
+{
+    const index = file(generate(fixture('singletons')), 'index.ts');
+
+    assert.match(index, /^ {4}readonly siteSettings: runtime\.SingletonReader<SiteSettings>;$/m);
+    assert.match(index, /^ {8}siteSettings: content\.singleton<SiteSettings>\("siteSettings", "site-settings"\),$/m);
+    // It extends page, so a read of page finds it, as any subtype's entry.
+    assert.match(index, /^ {8}page: content\.type<AnyPage, never>\("page", \["homePage", "page"\]\),$/m);
+});
+
+test('a singleton with no entrySlug is read as an ordinary type, with a warning', () =>
+{
+    const generated = generate(model({ siteSettings: [] }, {
+        types: { siteSettings: { slug: 'siteSettings', name: 'Site settings', version: 'v', singleton: true, fields: [] } },
+    }));
+
+    assert.match(file(generated, 'index.ts'), /^ {4}readonly siteSettings: runtime\.TypeReader<SiteSettings, never>;$/m);
+    assert.deepEqual(generated.warnings, ['Type \'siteSettings\' is a singleton with no entrySlug, so it is read as an ordinary type. Pull the type model again.']);
+});
+
 test('a trait is an interface every type with it extends, and is in no entry\'s type', () =>
 {
     const generated = generate(fixture('traits'));
@@ -458,4 +479,17 @@ export function aNestedMenuByTheTypes(navigation: SiteNavigation): void
     // @ts-expect-error: a menu item's children are menu items, not locale menu items
     const other: MenuItem['_type'] | undefined = navigation.topNavigation?.[0]?.children?.[0]?._type;
     void other;
+}
+
+/** Compiled by `npm run typecheck`, never called: a singleton's getter is its entry or null, and it has no list. */
+export async function aSingletonByTheTypes(coho: Singletons): Promise<void>
+{
+    const settings: SiteSettings | null = await coho.siteSettings.get({ depth: 1 });
+    const name: string | undefined = settings?.siteName;
+    const home: HomePage | null = await coho.homePage.get();
+    void [name, home];
+    // @ts-expect-error: a singleton has no list
+    void coho.siteSettings.list;
+    // @ts-expect-error: nor a read by slug, since its slug is fixed
+    void coho.homePage.bySlug;
 }
