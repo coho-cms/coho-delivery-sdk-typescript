@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createContentClient, createDeliveryClient, imageUrl, srcset } from '../src/index.ts';
+import { createContentClient, createDeliveryClient, imageUrl, resolveEntry, srcset } from '../src/index.ts';
 import type { Asset, EntryBase, ImageAsset } from '../src/index.ts';
 import { BASE, KEY, replay } from './support.ts';
 
@@ -17,6 +17,7 @@ const MISSING = '00000000-0000-7000-8000-0000000000ef';
 interface Figure extends EntryBase<'figure'>
 {
     readonly caption?: string;
+    readonly body?: string;
     readonly image?: Asset | null;
     readonly poster?: Asset | null;
     readonly gallery?: readonly Asset[];
@@ -78,4 +79,28 @@ test('the raw client carries the warnings that name what is missing', async () =
         { code: 'ASSET_MISSING', entry: FIGURE, field: 'gallery', asset: MISSING },
         { code: 'ASSET_MISSING', entry: FIGURE, field: 'poster', asset: MISSING },
     ]);
+});
+
+/*
+ * The prose scheme, against what the server sends rather than a body written here.
+ *
+ * `figure-1`'s body names its image as `asset:bridge`, and the recording carries that asset
+ * in `_bodyAssets` — so this checks the resolver, the key it reads, and delivery's embedding
+ * of a slug all at once. A hand-written body could not: it would agree with whatever the
+ * resolver happened to do.
+ */
+test('a recorded body resolves to the URL delivery sent for the asset it names', async () =>
+{
+    const figure = await figures().byId(FIGURE);
+    assert.ok(figure);
+
+    // As delivered: the reference stands, and the asset it names is carried beside it.
+    assert.equal(figure.body, 'A figure, and the bridge: ![A bridge](asset:bridge)');
+    assert.deepEqual(figure._bodyAssets?.map((asset) => asset.slug), ['bridge']);
+
+    const resolved = resolveEntry(figure);
+    assert.equal(resolved.body, `A figure, and the bridge: ![A bridge](${figure.image?.url})`);
+
+    // ⚠️ The entry as delivered is untouched, which is what keeps a resolved body out of a write.
+    assert.equal(figure.body, 'A figure, and the bridge: ![A bridge](asset:bridge)');
 });

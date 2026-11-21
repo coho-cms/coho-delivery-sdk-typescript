@@ -10,6 +10,9 @@ export interface Figure extends runtime.EntryBase<"figure">
     /** caption */
     readonly caption?: string;
 
+    /** body. Markdown. */
+    readonly body?: string;
+
     /** image. Accepts image/*. */
     readonly image?: runtime.Asset | null;
 
