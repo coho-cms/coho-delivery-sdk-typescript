@@ -1,3 +1,4 @@
+import type { Asset } from './assets.ts';
 import type { Entry, EntryGraph } from './types.ts';
 
 /** Whether a reference field holds one link or an array of them. */
@@ -41,6 +42,20 @@ export interface EntryBase<T extends string = string>
 
     /** The locale the entry was projected for. Absent when none was requested. */
     readonly _locale?: string;
+
+    /**
+     * The assets this entry's prose points at, since delivery 2.3.0 (coho-data doc 80 §10).
+     *
+     * A Markdown or HTML field names an asset by slug, `asset:bridge-at-dusk`, and Coho
+     * records what the prose named on every save. Delivered embedded, like any asset field,
+     * so a page can turn a reference back into a URL without a second request.
+     *
+     * A system key rather than a generated field, which is why it is here beside `_slug`
+     * and not in a type's own: no content type declares it, and the type model does not
+     * carry it. Absent on an entry whose type could hold no prose, and on one whose prose
+     * names nothing.
+     */
+    readonly _bodyAssets?: readonly Asset[];
 }
 
 /**

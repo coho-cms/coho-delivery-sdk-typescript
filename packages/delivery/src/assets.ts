@@ -22,6 +22,13 @@ export interface Asset
     /** The asset's id: what the entry's field links. */
     readonly id?: string;
 
+    /**
+     * The asset's slug, since delivery 2.3.0. What prose names it by: a Markdown or HTML
+     * field writes `asset:<slug>`, and a page resolving one matches it against this
+     * (coho-data doc 80 ML-1).
+     */
+    readonly slug?: string;
+
     /** The original bytes, from the asset CDN. */
     readonly url?: string;
 
