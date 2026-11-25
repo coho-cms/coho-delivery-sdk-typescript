@@ -171,10 +171,7 @@ export function srcset(asset: Asset, options: SrcsetOptions = {}): string
  * A URL that downloads the asset rather than opening it: the original, with `dl=1`
  * asking the edge to send it as an attachment under its filename. A browser ignores
  * the `download` attribute on a link to another origin, which the asset CDN is, so the
- * edge has to say it.
- *
- * ⚠️ The edge does not honour `dl` yet (doc 40 §5.1). Until it does, the file opens in
- * the browser as `url` does; the link needs no change when it starts to.
+ * edge has to say it (doc 40 §5.1).
  */
 export function downloadUrl(asset: Asset): string
 {

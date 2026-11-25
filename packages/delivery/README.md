@@ -111,7 +111,7 @@ downloadUrl(post.brochure);                                               // the
 
 - **Only raster images resize.** An SVG, a PDF or any other file has only its original, which `imageUrl` and `srcset` return whatever the options.
 - **The edge snaps widths up** to `IMAGE_WIDTHS`, so a `srcset` built from them lands on cached images. A crop (`fill`, `crop`, `thumb`) centres on the asset's focal point.
-- **`downloadUrl` adds `dl=1`**, since a browser ignores `download` on a link to another origin. The edge does not honour it yet, so until it does the file opens in the browser.
+- **`downloadUrl` adds `dl=1`**, since a browser ignores `download` on a link to another origin. The edge answers it by sending the file as an attachment, under its own name.
 - **An asset is as public as its URL**, drafts included, and deleting it does not stop the URL working.
 
 The asset shape is the asset API's (`url`, `imageUrl`, `file`, `focalPoint`, `alt`, `title`). Delivery does not serve asset fields yet.
